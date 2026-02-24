@@ -1,0 +1,12 @@
+
+flask
+Flask-SQLAlchemy
+psycopg2-binary
+requests
+Pillow
+pytesseract
+line-bot-sdk
+Pillow
+psutil
+gunicorn
+python-dotenv
