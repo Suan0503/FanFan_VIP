@@ -3,6 +3,9 @@ import os
 import sys
 import requests
 import json
+import random
+import string
+import re
 import time
 import threading
 from datetime import datetime, timedelta
@@ -33,6 +36,141 @@ if DATABASE_URL:
     app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     db = SQLAlchemy(app)
+
+    # 會員資料表
+    class Member(db.Model):
+        id = db.Column(db.Integer, primary_key=True)
+        line_user_id = db.Column(db.String(64), unique=True, nullable=False)
+        name = db.Column(db.String(64))
+        status = db.Column(db.String(16), default='inactive')  # active/inactive
+        expire_at = db.Column(db.DateTime, nullable=True)
+        created_at = db.Column(db.DateTime, default=datetime.utcnow)
+        updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # 訂單資料表
+    class Order(db.Model):
+        id = db.Column(db.Integer, primary_key=True)
+        member_id = db.Column(db.Integer, db.ForeignKey('member.id'))
+        amount = db.Column(db.Integer)
+        status = db.Column(db.String(16), default='pending')  # pending/paid/failed
+        created_at = db.Column(db.DateTime, default=datetime.utcnow)
+        paid_at = db.Column(db.DateTime)
+        order_no = db.Column(db.String(32), unique=True)
+        member = db.relationship('Member', backref=db.backref('orders', lazy=True))
+
+    # 序號資料表（卡密）
+    class LicenseCode(db.Model):
+        id = db.Column(db.Integer, primary_key=True)
+        code = db.Column(db.String(32), unique=True, nullable=False)
+        days = db.Column(db.Integer, default=30)
+        used = db.Column(db.Boolean, default=False)
+        used_by = db.Column(db.Integer, db.ForeignKey('member.id'), nullable=True)
+        created_at = db.Column(db.DateTime, default=datetime.utcnow)
+        used_at = db.Column(db.DateTime, nullable=True)
+
+    def _generate_single_code():
+        # 格式: FANVIP + 10 碼 (大寫英數)
+        suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+        return f"FANVIP{suffix}"
+
+    @app.route('/admin/generate_codes', methods=['POST'])
+    def admin_generate_codes():
+        # 需要設定環境變數 ADMIN_TOKEN，並在請求 header X-Admin-Token 傳入
+        ADMIN_TOKEN = os.getenv('ADMIN_TOKEN', '')
+        token = request.headers.get('X-Admin-Token', '')
+        if not ADMIN_TOKEN or token != ADMIN_TOKEN:
+            return json.dumps({'error': 'unauthorized'}), 401
+        try:
+            body = request.get_json() or {}
+            count = int(body.get('count', 1))
+            days = int(body.get('days', 30))
+        except:
+            return json.dumps({'error': 'invalid request'}), 400
+        if count < 1 or count > 100:
+            return json.dumps({'error': 'count out of range (1-100)'}), 400
+        codes = []
+        for _ in range(count):
+            for _retry in range(5):
+                code = _generate_single_code()
+                if not db.session.query(LicenseCode).filter_by(code=code).first():
+                    lc = LicenseCode(code=code, days=days)
+                    db.session.add(lc)
+                    db.session.commit()
+                    codes.append(code)
+                    break
+        return json.dumps({'codes': codes, 'days': days}, ensure_ascii=False), 200
+
+    @app.route('/admin/codes', methods=['GET'])
+    def admin_list_codes():
+        ADMIN_TOKEN = os.getenv('ADMIN_TOKEN', '')
+        token = request.headers.get('X-Admin-Token', '')
+        if not ADMIN_TOKEN or token != ADMIN_TOKEN:
+            return json.dumps({'error': 'unauthorized'}), 401
+        limit = int(request.args.get('limit', 500))
+        q = db.session.query(LicenseCode).order_by(LicenseCode.created_at.desc()).limit(limit).all()
+        out = []
+        for lc in q:
+            out.append({
+                'code': lc.code,
+                'days': lc.days,
+                'used': bool(lc.used),
+                'used_by': lc.used_by,
+                'used_at': lc.used_at.isoformat() if lc.used_at else None,
+                'created_at': lc.created_at.isoformat()
+            })
+        return json.dumps({'codes': out}, ensure_ascii=False), 200
+
+    @app.route('/admin/export_codes', methods=['GET'])
+    def admin_export_codes():
+        ADMIN_TOKEN = os.getenv('ADMIN_TOKEN', '')
+        token = request.headers.get('X-Admin-Token', '')
+        if not ADMIN_TOKEN or token != ADMIN_TOKEN:
+            return 'unauthorized', 401
+        limit = int(request.args.get('limit', 10000))
+        q = db.session.query(LicenseCode).order_by(LicenseCode.created_at.desc()).limit(limit).all()
+        # build CSV
+        rows = ['code,days,used,used_by,used_at,created_at']
+        for lc in q:
+            rows.append(','.join([
+                lc.code,
+                str(lc.days),
+                str(int(bool(lc.used))),
+                str(lc.used_by) if lc.used_by else '',
+                lc.used_at.isoformat() if lc.used_at else '',
+                lc.created_at.isoformat()
+            ]))
+        return '\n'.join(rows), 200, {'Content-Type': 'text/csv; charset=utf-8'}
+
+    @app.route('/admin/run_expiry_check', methods=['POST'])
+    def admin_run_expiry_check():
+        ADMIN_TOKEN = os.getenv('ADMIN_TOKEN', '')
+        token = request.headers.get('X-Admin-Token', '')
+        if not ADMIN_TOKEN or token != ADMIN_TOKEN:
+            return json.dumps({'error': 'unauthorized'}), 401
+        count = check_member_expiry()
+        return json.dumps({'expired_count': count}, ensure_ascii=False), 200
+
+    # 初始化資料庫
+    with app.app_context():
+        db.create_all()
+
+        def check_member_expiry():
+            if not db:
+                return 0
+            now = datetime.utcnow()
+            expired = db.session.query(Member).filter(Member.expire_at != None, Member.expire_at < now, Member.status == 'active').all()
+            count = 0
+            for m in expired:
+                m.status = 'inactive'
+                count += 1
+            if count:
+                db.session.commit()
+            return count
+
+        # 在啟動時檢查一次到期
+        if db:
+            with app.app_context():
+                check_member_expiry()
 
 line_bot_api = LineBotApi(os.getenv('CHANNEL_ACCESS_TOKEN'))
 handler = WebhookHandler(os.getenv('CHANNEL_SECRET'))
@@ -1157,6 +1295,24 @@ def webhook():
         if raw_group_id:
             touch_group_activity(raw_group_id)
 
+        # --- 用戶加為好友時，推送歡迎訊息與功能選單 ---
+        if event_type == 'follow':
+            welcome_text = (
+                "🎉 歡迎加入 FanFan VIP 服務！\n\n"
+                "請直接輸入數字或點選下方選單功能：\n"
+                "1️⃣ 會員中心\n"
+                "2️⃣ 服務功能\n"
+                "3️⃣ 開通/續費\n"
+                "4️⃣ 客服/常見問題\n"
+                "5️⃣ 設定\n"
+                "0️⃣ 關於本服務"
+            )
+            reply(event['replyToken'], {
+                "type": "text",
+                "text": welcome_text
+            })
+            continue
+
         # --- 機器人被加進群組時公告 + 自動跳出語言選單 ---
         if event_type == 'join':
             reply(event['replyToken'], [
@@ -1211,51 +1367,111 @@ def webhook():
             text = event['message']['text'].strip()
             lower = text.lower()
 
-            # --- 切換本群預設翻譯引擎為 DeepL 優先 ---
-            # 預設為 Google -> DeepL，若輸入 "DEEPL" 則改為 DeepL -> Google
-            if lower == 'deepl':
-                set_engine_pref(group_id, 'deepl')
-                reply(event['replyToken'], {
-                    "type": "text",
-                    "text": "✅ 本群預設翻譯引擎已改為：先 DeepL，再 Google（若 DeepL 失敗會自動改用 Google）。"
-                })
-                continue
-
-            # --- 認證暫時管理員 ---
-            if text == "管理員認證":
-                if group_id and group_id not in data.get('group_admin', {}):
-                    data.setdefault('group_admin', {})
-                    data['group_admin'][group_id] = user_id
-                    save_data()
+            # --- 主要功能選單指令 ---
+            if text in ['1', '會員中心']:
+                # 查詢會員資料
+                member_info = None
+                if db:
+                    member_info = db.session.query(Member).filter_by(line_user_id=user_id).first()
+                if member_info:
                     reply(event['replyToken'], {
                         "type": "text",
-                        "text": "✅ 已設為本群暫時管理員，可以設定翻譯語言！"
+                        "text": f"👤 會員中心\n\n狀態：{member_info.status}\n註冊時間：{member_info.created_at.strftime('%Y-%m-%d %H:%M')}"
                     })
                 else:
-                    if is_group_admin(user_id, group_id):
+                    # 新用戶自動註冊
+                    if db:
+                        new_member = Member(line_user_id=user_id, status='inactive')
+                        db.session.add(new_member)
+                        db.session.commit()
                         reply(event['replyToken'], {
                             "type": "text",
-                            "text": "你已是本群的暫時管理員！"
+                            "text": "👤 會員中心\n\n已自動註冊，請使用 /序號 <序號> 進行開通或聯絡客服。"
                         })
                     else:
                         reply(event['replyToken'], {
                             "type": "text",
-                            "text": "本群已有暫時管理員，如需更換請聯絡主人。"
+                            "text": "👤 會員中心\n\n系統暫時無法查詢會員資料。"
                         })
                 continue
 
-            # --- 主人設定租戶管理員 ---
-            if (lower.startswith('/設定管理員') or lower.startswith('設定管理員')) and user_id in MASTER_USER_IDS:
-                parts = text.replace('　', ' ').split()
-                # 格式: /設定管理員 @某人 [1-12]
-                if len(parts) >= 3:
-                    # 提取 user_id 和月份
-                    mentioned_users = []
-                    # 從 event 中取得 mention 資訊
-                    message = event.get('message', {})
-                    if 'mention' in message:
-                        mentions = message['mention'].get('mentionees', [])
-                        for mention in mentions:
+            if text in ['2', '服務功能']:
+                reply(event['replyToken'], {
+                    "type": "text",
+                    "text": "🛠 服務功能\n\n目前提供：\n- AI 輔助\n- 翻譯\n- 群組管理\n（更多功能陸續開放）"
+                })
+                continue
+
+            if text in ['3', '開通', '續費']:
+                reply(event['replyToken'], {
+                    "type": "text",
+                    "text": "💳 開通/續費\n\n請點擊下方連結進行付費（測試版）：\nhttps://example.com/pay"
+                })
+                continue
+
+            if text in ['4', '客服', '常見問題']:
+                reply(event['replyToken'], {
+                    "type": "text",
+                    "text": "📞 客服/常見問題\n\n如有疑問請聯絡：support@example.com"
+                })
+                continue
+
+            if text in ['5', '設定']:
+                reply(event['replyToken'], {
+                    "type": "text",
+                    "text": "⚙️ 設定\n\n目前可調整：語言、通知、帳號管理（敬請期待）"
+                })
+                continue
+
+            if text in ['0', '關於']:
+                reply(event['replyToken'], {
+                    "type": "text",
+                    "text": "ℹ️ 關於本服務\n\nFanFan VIP 提供 AI 輔助、翻譯、群組管理等功能，歡迎體驗！"
+                })
+                continue
+
+            # --- 序號兌換處理（格式：FANVIP + 10 碼，共 16 碼） ---
+            text_upper = text.upper()
+            if re.match(r'^FANVIP[A-Z0-9]{10}$', text_upper):
+                code_str = text_upper
+                if db:
+                    lc = db.session.query(LicenseCode).filter_by(code=code_str).first()
+                    if not lc:
+                        reply(event['replyToken'], {
+                            'type': 'text',
+                            'text': '❌ 序號不存在，請確認是否輸入正確。'
+                        })
+                    elif lc.used:
+                        reply(event['replyToken'], {
+                            'type': 'text',
+                            'text': '❌ 此序號已被使用。如有問題請聯絡客服。'
+                        })
+                    else:
+                        member = db.session.query(Member).filter_by(line_user_id=user_id).first()
+                        if not member:
+                            member = Member(line_user_id=user_id, status='active')
+                            db.session.add(member)
+                            db.session.commit()
+                        else:
+                            member.status = 'active'
+                            db.session.commit()
+                        lc.used = True
+                        lc.used_by = member.id
+                        lc.used_at = datetime.utcnow()
+                        # 設定會員到期
+                        member.expire_at = datetime.utcnow() + timedelta(days=lc.days)
+                        member.status = 'active'
+                        db.session.commit()
+                        reply(event['replyToken'], {
+                            'type': 'text',
+                            'text': f'✅ 序號兌換成功！會員已開通（{member.line_user_id}）。'
+                        })
+                else:
+                    reply(event['replyToken'], {
+                        'type': 'text',
+                        'text': '系統錯誤：資料庫未啟用，無法兌換。'
+                    })
+                continue
                             if mention.get('type') == 'user':
                                 mentioned_users.append(mention.get('userId'))
                     
@@ -1280,6 +1496,55 @@ def webhook():
                     tenant_user_id = mentioned_users[0]
                     token, expires_at = create_tenant(tenant_user_id, months)
                     add_group_to_tenant(tenant_user_id, group_id)
+                if lower.startswith('/序號'):
+                    if user_id not in load_master_users():
+                        reply(event['replyToken'], {
+                            'type': 'text',
+                            'text': '❌ 權限不足，只有管理者可使用此指令。'
+                        })
+                        continue
+                    parts = text.replace('　', ' ').split()
+                    count = 1
+                    days = 30
+                    try:
+                        if len(parts) == 2:
+                            # /序號 30天
+                            p = parts[1]
+                            if p.endswith('天'):
+                                days = int(p[:-1])
+                        elif len(parts) >= 3:
+                            # /序號 5 30天
+                            count = int(parts[1])
+                            p = parts[2]
+                            if p.endswith('天'):
+                                days = int(p[:-1])
+                    except:
+                        reply(event['replyToken'], {
+                            'type': 'text',
+                            'text': '❌ 指令格式錯誤，範例：/序號 30天 或 /序號 5 30天'
+                        })
+                        continue
+                    if count < 1 or count > 100:
+                        reply(event['replyToken'], {
+                            'type': 'text',
+                            'text': '❌ 產生數量需介於 1 到 100 之間。'
+                        })
+                        continue
+                    created = []
+                    for _ in range(count):
+                        for _retry in range(5):
+                            code = _generate_single_code()
+                            if not db.session.query(LicenseCode).filter_by(code=code).first():
+                                lc = LicenseCode(code=code, days=days)
+                                db.session.add(lc)
+                                db.session.commit()
+                                created.append(code)
+                                break
+                    # 回傳序號（若過多，改為用私訊或管理面板，此處簡單回覆）
+                    reply_text = f"✅ 已產生 {len(created)} 個序號（有效天數：{days}天）\n"
+                    reply_text += '\n'.join(created)
+                    reply(event['replyToken'], {'type': 'text', 'text': reply_text})
+                    continue
                     
                     # 同時設為群組管理員
                     data.setdefault('group_admin', {})
