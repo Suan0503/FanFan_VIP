@@ -18,8 +18,17 @@ if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # ============== LINE Bot 設定 ==============
-CHANNEL_ACCESS_TOKEN = os.getenv('CHANNEL_ACCESS_TOKEN', '')
-CHANNEL_SECRET = os.getenv('CHANNEL_SECRET', '').encode('utf-8')
+# support both old and new env var names for convenience
+_channel_token = os.getenv('CHANNEL_ACCESS_TOKEN') or os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+CHANNEL_ACCESS_TOKEN = _channel_token or ''
+_channel_secret = os.getenv('CHANNEL_SECRET') or os.getenv('LINE_CHANNEL_SECRET')
+CHANNEL_SECRET = (_channel_secret or '').encode('utf-8')
+
+# runtime check for missing credentials
+if not CHANNEL_ACCESS_TOKEN:
+    print('WARNING: CHANNEL_ACCESS_TOKEN is not set. Bot replies will fail.')
+if not CHANNEL_SECRET:
+    print('WARNING: CHANNEL_SECRET is not set. Webhook signature validation may fail.')
 
 # ============== 翻譯服務設定 ==============
 DEEPL_API_KEY = os.getenv('DEEPL_API_KEY', '')

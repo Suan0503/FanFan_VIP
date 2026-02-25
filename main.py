@@ -70,7 +70,10 @@ MASTER_USER_IDS = load_master_users()
 
 
 # LINE client
-LINE_TOKEN = os.getenv('CHANNEL_ACCESS_TOKEN', '')
+LINE_TOKEN = os.getenv('CHANNEL_ACCESS_TOKEN', '') or os.getenv('LINE_CHANNEL_ACCESS_TOKEN', '')
+if not LINE_TOKEN:
+    print('⚠️ WARNING: CHANNEL_ACCESS_TOKEN not set, bot will not reply to messages')
+
 line_bot_api = None
 if LINE_TOKEN:
     line_bot_api = LineBotApi(LINE_TOKEN)
@@ -163,6 +166,12 @@ def admin_run_expiry_check():
 
 CODE_RE = re.compile(r'^(FANVIP[A-Z0-9]{10})$', re.I)
 
+
+# support both /callback and /webhook for backward compatibility
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    # simply forward to callback logic
+    return callback()
 
 @app.route('/callback', methods=['POST'])
 def callback():
