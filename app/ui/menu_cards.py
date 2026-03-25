@@ -8,6 +8,7 @@ from linebot.v3.messaging import (  # 匯入 Flex 訊息元件
     MessageAction,
 )
 
+from app.core.languages import SUPPORTED_LANGUAGES  # 匯入語言設定
 from app.ui.language_menu import build_language_menu_quick_reply  # 匯入語言快速選單
 
 
@@ -113,3 +114,73 @@ def build_main_menu_card(source_type: str, is_group_manager: bool) -> FlexMessag
         contents=carousel,
         quickReply=build_language_menu_quick_reply(),
     )  # 回傳 Flex 主選單
+
+
+def build_language_setting_card(selected_codes: list[str], source_type: str, can_manage_group: bool) -> FlexMessage:
+    title = "群組翻譯設定" if source_type == "group" else "個人翻譯設定"  # 卡片標題
+    subtitle = "請加上 / 取消翻譯語言，可複選。" if source_type == "group" else "請選擇要翻譯成的語言。"  # 卡片副標
+
+    selected_labels = [name for name, code in SUPPORTED_LANGUAGES.items() if code in selected_codes]  # 已選語言名稱
+    selected_text = "、".join(selected_labels) if selected_labels else "尚未設定"  # 已選語言摘要
+
+    if source_type == "group" and not can_manage_group:
+        permission_hint = "你目前沒有設定權限（需邀請者代表 / 管理員 / 所有者）。"  # 權限提示
+    else:
+        permission_hint = "點擊下方語言按鈕即可切換勾選狀態。"  # 操作提示
+
+    button_contents = []  # 語言按鈕列表
+    for language_name, language_code in SUPPORTED_LANGUAGES.items():
+        is_selected = language_code in selected_codes  # 是否已勾選
+        label_prefix = "✅ " if is_selected else "☐ "  # 勾選狀態圖示
+        action_text = f"設定語言 {language_name}"  # 點擊送出的指令
+        button_contents.append(
+            FlexButton(
+                style="primary" if is_selected else "secondary",
+                color="#D9144E" if is_selected else "#FF6B57",
+                action=MessageAction(label=f"{label_prefix}{language_name}", text=action_text),
+                height="sm",
+                margin="sm",
+            )
+        )  # 建立語言按鈕
+
+    button_contents.append(
+        FlexButton(
+            style="secondary",
+            action=MessageAction(label="🔁 重設翻譯設定", text="重設翻譯設定"),
+            margin="md",
+            height="sm",
+        )
+    )  # 建立重設按鈕
+
+    bubble = FlexBubble(
+        size="giga",
+        header=FlexBox(
+            layout="vertical",
+            paddingAll="18px",
+            backgroundColor="#F6EEF1",
+            contents=[
+                FlexText(text=f"🎎 {title}", weight="bold", size="xl", color="#D9144E"),
+                FlexText(text=subtitle, size="sm", color="#564A4A", wrap=True, margin="sm"),
+                FlexText(text=f"目前勾選：{selected_text}", size="sm", color="#D9144E", wrap=True, margin="md"),
+            ],
+        ),
+        body=FlexBox(
+            layout="vertical",
+            paddingAll="14px",
+            spacing="sm",
+            contents=button_contents,
+        ),
+        footer=FlexBox(
+            layout="vertical",
+            paddingAll="12px",
+            contents=[
+                FlexText(text=permission_hint, size="xs", color="#6F6B6B", wrap=True),
+            ],
+        ),
+    )  # 建立語言設定卡片
+
+    return FlexMessage(
+        altText="翻翻君語言設定",
+        contents=bubble,
+        quickReply=build_language_menu_quick_reply(),
+    )  # 回傳語言設定卡片

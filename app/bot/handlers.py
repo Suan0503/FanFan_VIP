@@ -29,7 +29,7 @@ from app.services.id_service import generate_member_code  # 匯入編號服務
 from app.services.translation_service import translate_text  # 匯入翻譯服務
 from app.services.permission_service import can_manage_group  # 匯入權限服務
 from app.ui.language_menu import build_language_menu_quick_reply  # 匯入語言選單
-from app.ui.menu_cards import build_main_menu_card  # 匯入主選單小卡
+from app.ui.menu_cards import build_main_menu_card, build_language_setting_card  # 匯入主選單與語言設定小卡
 
 
 configuration = Configuration(access_token=settings.line_channel_access_token)  # 建立 LINE API 設定
@@ -197,16 +197,19 @@ def handle_text_message(event: MessageEvent) -> None:
             member_code = generate_member_code(db)  # 產生新編號
             user = create_user(db, user_id, member_code, DEFAULT_LANGUAGE_CODE)  # 自動補建使用者
 
-        if text in 語言選單指令:
-            _reply_text(
-                reply_token,
-                "請加上/取消要翻譯成的語言（群組可複選）：",
-                with_language_menu=True,
-            )  # 顯示語言選單
-            return
-
         current_group = get_group(db, group_id) if group_id else None  # 先讀取群組資料供說明與權限判斷使用
         is_group_manager = bool(current_group and can_manage_group(current_group, user, user_id))  # 是否具備群組管理權限
+
+        if text in 語言選單指令:
+            selected_codes = get_group_languages(db, group_id) if group_id else [user.target_language] if user else [DEFAULT_LANGUAGE_CODE]  # 取得目前勾選語言
+            _reply_messages(
+                reply_token,
+                [
+                    TextMessage(text="請使用下方小卡設定翻譯語言。", quickReply=None, quoteToken=None),
+                    build_language_setting_card(selected_codes, source_type, is_group_manager),
+                ],
+            )  # 顯示語言設定小卡
+            return
 
         if text in 主選單指令:
             _reply_messages(
@@ -266,11 +269,13 @@ def handle_text_message(event: MessageEvent) -> None:
                 else:
                     updated_codes = set_group_languages(db, group_id, selected_codes)  # 多選時直接覆蓋
 
-                _reply_text(
+                _reply_messages(
                     reply_token,
-                    f"群組翻譯語言已更新：{_群組語言摘要(updated_codes)}\n可繼續點選語言按鈕做加上/取消。",
-                    with_language_menu=True,
-                )  # 回覆成功
+                    [
+                        TextMessage(text=f"群組翻譯語言已更新：{_群組語言摘要(updated_codes)}", quickReply=None, quoteToken=None),
+                        build_language_setting_card(updated_codes, source_type, True),
+                    ],
+                )  # 顯示更新後小卡
                 return
 
             if user:
@@ -284,7 +289,13 @@ def handle_text_message(event: MessageEvent) -> None:
                 _reply_text(reply_token, "此指令僅限邀請者代表/管理員/所有者使用。")  # 權限不足
                 return
             updated_codes = reset_group_languages(db, group_id)  # 重設群組翻譯語言
-            _reply_text(reply_token, f"群組翻譯語言已重設：{_群組語言摘要(updated_codes)}", with_language_menu=True)  # 回覆重設成功
+            _reply_messages(
+                reply_token,
+                [
+                    TextMessage(text=f"群組翻譯語言已重設：{_群組語言摘要(updated_codes)}", quickReply=None, quoteToken=None),
+                    build_language_setting_card(updated_codes, source_type, True),
+                ],
+            )  # 回覆重設成功並顯示小卡
             return
 
         if source_type == "group" and group_id and text in 管理員白名單指令:
