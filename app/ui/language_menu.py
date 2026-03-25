@@ -14,4 +14,5 @@ def build_language_menu_quick_reply() -> QuickReply:
                 )
             )
         )  # 依序建立語言按鈕
+    items.append(QuickReplyItem(action=MessageAction(label="重設", text="重設翻譯設定")))  # 新增重設按鈕
     return QuickReply(items=items)  # 回傳 Quick Reply

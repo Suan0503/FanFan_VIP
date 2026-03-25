@@ -1,6 +1,6 @@
 from datetime import datetime  # 匯入時間型別
 
-from sqlalchemy import String, DateTime, Boolean, UniqueConstraint  # 匯入欄位型別
+from sqlalchemy import String, DateTime, Boolean, UniqueConstraint, ForeignKey  # 匯入欄位型別
 from sqlalchemy.orm import Mapped, mapped_column  # 匯入欄位映射
 
 from app.db.base import Base  # 匯入 Base
@@ -25,4 +25,16 @@ class GroupSetting(Base):
     line_group_id: Mapped[str] = mapped_column(String(64), nullable=False)  # 群組 ID
     inviter_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)  # 邀請者代表 ID
     target_language: Mapped[str] = mapped_column(String(16), nullable=False, default="zh-TW")  # 群組語言
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 建立時間
+
+
+class GroupLanguageSelection(Base):
+    __tablename__ = "group_language_selections"  # 群組多語設定表
+    __table_args__ = (
+        UniqueConstraint("line_group_id", "language_code", name="uq_group_language_pair"),
+    )  # 群組與語言唯一
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)  # 主鍵
+    line_group_id: Mapped[str] = mapped_column(String(64), ForeignKey("group_settings.line_group_id"), nullable=False)  # 群組 ID
+    language_code: Mapped[str] = mapped_column(String(16), nullable=False)  # 語言代碼
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 建立時間

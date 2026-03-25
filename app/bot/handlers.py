@@ -17,9 +17,13 @@ from app.repositories.user_repository import get_user_by_line_id, create_user, u
 from app.repositories.group_repository import (
     get_group,
     create_group,
-    update_group_language,
     bind_group_inviter,
     set_group_inviter,
+    get_group_languages,
+    set_group_languages,
+    add_group_language,
+    remove_group_language,
+    reset_group_languages,
 )  # 匯入群組存取
 from app.services.id_service import generate_member_code  # 匯入編號服務
 from app.services.translation_service import translate_text  # 匯入翻譯服務
@@ -36,6 +40,7 @@ line_handler = WebhookHandler(settings.line_channel_secret)  # 建立 webhook ha
 綁定邀請者指令 = "綁定邀請者"  # 綁定邀請者代表指令
 管理員白名單指令 = {"查看群組設定", "重設邀請者"}  # 僅管理者可用的群組指令
 說明指令 = {"指令說明", "使用說明", "幫助"}  # 顯示說明指令
+重設翻譯指令 = {"重設翻譯設定", "重設語言"}  # 重設群組翻譯語言
 
 
 def _語言代碼轉名稱(language_code: str) -> str:
@@ -43,6 +48,23 @@ def _語言代碼轉名稱(language_code: str) -> str:
         if code == language_code:
             return language_name  # 找到對應語言名稱
     return f"未知語言({language_code})"  # 找不到時保留代碼
+
+
+def _語言名稱轉代碼(language_label: str) -> str | None:
+    return SUPPORTED_LANGUAGES.get(language_label)  # 由中文語言名稱轉代碼
+
+
+def _解析語言名稱清單(raw_text: str) -> list[str]:
+    normalized = raw_text.replace("、", ",").replace("，", ",")  # 統一分隔符號
+    parts = [part.strip() for part in normalized.split(",") if part.strip()]  # 分割並清理
+    return parts  # 回傳語言名稱清單
+
+
+def _群組語言摘要(language_codes: list[str]) -> str:
+    if not language_codes:
+        return "(無)"  # 防禦性回傳
+    labels = [_語言代碼轉名稱(code) for code in language_codes]  # 轉成語言名稱
+    return "、".join(labels)  # 組合摘要文字
 
 
 def _標準化指令文字(text: str) -> str:
@@ -58,7 +80,7 @@ def _建立說明文字(source_type: str, is_group_manager: bool) -> str:
         "1. 語言設定 / 語言選單 / 選單",
         "   開啟語言快速選單。",
         "2. 設定語言 中文",
-        "   可改成英文、泰文、越南文、緬甸文、韓文、印尼文、日文、俄文。",
+        "   個人聊天可切換單一翻譯語言。",
         "3. 指令說明 / 使用說明 / 幫助",
         "   顯示這份說明。",
     ]  # 基礎說明
@@ -68,9 +90,13 @@ def _建立說明文字(source_type: str, is_group_manager: bool) -> str:
             [
                 "4. 綁定邀請者",
                 "   由群組第一位綁定者成為邀請者代表。",
-                "5. 查看群組設定",
+                "5. 設定語言 中文、泰文",
+                "   群組可複選語言，之後每句都會翻譯成多語。",
+                "6. 重設翻譯設定",
+                "   把群組翻譯語言重設成中文。",
+                "7. 查看群組設定",
                 "   查看本群翻譯語言與邀請者代表。",
-                "6. 重設邀請者",
+                "8. 重設邀請者",
                 "   把邀請者代表改成目前發送指令的人。",
             ]
         )  # 群組指令
@@ -174,7 +200,7 @@ def handle_text_message(event: MessageEvent) -> None:
         if text in 語言選單指令:
             _reply_text(
                 reply_token,
-                "請選擇翻譯目標語言：",
+                "請加上/取消要翻譯成的語言（群組可複選）：",
                 with_language_menu=True,
             )  # 顯示語言選單
             return
@@ -207,24 +233,58 @@ def handle_text_message(event: MessageEvent) -> None:
             return
 
         if text.startswith("設定語言 "):
-            selected_label = text.replace("設定語言 ", "", 1).strip()  # 取出語言名稱
-            if selected_label not in SUPPORTED_LANGUAGES:
-                _reply_text(reply_token, "語言不支援，請重新選擇。", with_language_menu=True)  # 語言不存在
+            selected_labels = _解析語言名稱清單(text.replace("設定語言 ", "", 1).strip())  # 解析語言名稱
+            if not selected_labels:
+                _reply_text(reply_token, "請至少指定一種語言，例如：設定語言 中文")  # 參數不足
                 return
-            selected_code = SUPPORTED_LANGUAGES[selected_label]  # 取得語言代碼
+            selected_codes: list[str] = []  # 有效語言代碼
+            invalid_labels: list[str] = []  # 無效語言名稱
+            for label in selected_labels:
+                code = _語言名稱轉代碼(label)
+                if code:
+                    selected_codes.append(code)
+                else:
+                    invalid_labels.append(label)
+
+            if invalid_labels:
+                _reply_text(reply_token, f"以下語言不支援：{'、'.join(invalid_labels)}", with_language_menu=True)  # 語言不存在
+                return
 
             if source_type == "group" and group_id:
                 group = current_group or create_group(db, group_id)  # 取得群組設定
                 if not can_manage_group(group, user, user_id):
                     _reply_text(reply_token, "你沒有群組設定權限，僅邀請者代表/管理員/所有者可設定。")  # 權限不足
                     return
-                update_group_language(db, group, selected_code)  # 更新群組語言
-                _reply_text(reply_token, f"群組翻譯語言已設定為：{selected_label}")  # 回覆成功
+
+                if len(selected_codes) == 1 and len(selected_labels) == 1:
+                    code = selected_codes[0]  # 單選時使用切換模式
+                    current_codes = get_group_languages(db, group_id)  # 取得現有群組語言
+                    if code in current_codes:
+                        updated_codes = remove_group_language(db, group_id, code)  # 已選過則取消
+                    else:
+                        updated_codes = add_group_language(db, group_id, code)  # 未選過則加入
+                else:
+                    updated_codes = set_group_languages(db, group_id, selected_codes)  # 多選時直接覆蓋
+
+                _reply_text(
+                    reply_token,
+                    f"群組翻譯語言已更新：{_群組語言摘要(updated_codes)}\n可繼續點選語言按鈕做加上/取消。",
+                    with_language_menu=True,
+                )  # 回覆成功
                 return
 
             if user:
-                update_user_language(db, user, selected_code)  # 更新個人語言
-            _reply_text(reply_token, f"個人翻譯語言已設定為：{selected_label}")  # 回覆成功
+                update_user_language(db, user, selected_codes[0])  # 更新個人語言（單語）
+            _reply_text(reply_token, f"個人翻譯語言已設定為：{selected_labels[0]}")  # 回覆成功
+            return
+
+        if source_type == "group" and group_id and text in 重設翻譯指令:
+            group = current_group or create_group(db, group_id)  # 取得群組資料
+            if not can_manage_group(group, user, user_id):
+                _reply_text(reply_token, "此指令僅限邀請者代表/管理員/所有者使用。")  # 權限不足
+                return
+            updated_codes = reset_group_languages(db, group_id)  # 重設群組翻譯語言
+            _reply_text(reply_token, f"群組翻譯語言已重設：{_群組語言摘要(updated_codes)}", with_language_menu=True)  # 回覆重設成功
             return
 
         if source_type == "group" and group_id and text in 管理員白名單指令:
@@ -235,7 +295,8 @@ def handle_text_message(event: MessageEvent) -> None:
 
             if text == "查看群組設定":
                 inviter_text = group.inviter_user_id if group.inviter_user_id else "尚未綁定"  # 邀請者代表資訊
-                language_label = _語言代碼轉名稱(group.target_language)  # 轉換語言名稱
+                language_codes = get_group_languages(db, group_id)  # 取得群組語言清單
+                language_label = _群組語言摘要(language_codes)  # 轉換語言名稱
                 _reply_text(
                     reply_token,
                     f"群組設定：\n翻譯語言：{language_label}\n邀請者代表：{inviter_text}",
@@ -265,7 +326,13 @@ def handle_text_message(event: MessageEvent) -> None:
         target_code = DEFAULT_LANGUAGE_CODE  # 預設語言
         if source_type == "group" and group_id:
             group = current_group or create_group(db, group_id)  # 取得群組設定
-            target_code = group.target_language  # 採用群組語言
+            target_codes = get_group_languages(db, group_id)  # 採用群組多語設定
+            translated_lines: list[str] = []  # 群組多語翻譯結果
+            for language_code in target_codes:
+                translated_text = translate_text(text, language_code)  # 逐語言翻譯
+                translated_lines.append(f"【{_語言代碼轉名稱(language_code)}】\n{translated_text}")  # 組合單語結果
+            _reply_text(reply_token, "\n\n".join(translated_lines))  # 回覆多語翻譯
+            return
         elif user:
             target_code = user.target_language  # 採用個人語言
 
