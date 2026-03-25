@@ -28,7 +28,6 @@ from app.repositories.group_repository import (
 from app.services.id_service import generate_member_code  # 匯入編號服務
 from app.services.translation_service import translate_text  # 匯入翻譯服務
 from app.services.permission_service import can_manage_group  # 匯入權限服務
-from app.ui.language_menu import build_language_menu_quick_reply  # 匯入語言選單
 from app.ui.menu_cards import build_main_menu_card, build_language_setting_card  # 匯入主選單與語言設定小卡
 
 
@@ -119,7 +118,7 @@ def _建立說明文字(source_type: str, is_group_manager: bool) -> str:
 
 
 def _reply_text(reply_token: str, message: str, with_language_menu: bool = False) -> None:
-    quick_reply = build_language_menu_quick_reply() if with_language_menu else None  # 依需求加上語言選單
+    quick_reply = None  # 關閉底部 Quick Reply 小按鈕
     _reply_messages(reply_token, [TextMessage(text=message, quickReply=quick_reply, quoteToken=None)])  # 回覆單一文字
 
 
@@ -159,7 +158,7 @@ def handle_follow(event: FollowEvent) -> None:
     _reply_messages(
         reply_token,
         [
-            TextMessage(text=message, quickReply=build_language_menu_quick_reply(), quoteToken=None),
+            TextMessage(text=message, quickReply=None, quoteToken=None),
             build_main_menu_card(source_type="user", is_group_manager=False),
         ],
     )  # 回覆歡迎訊息與主選單小卡
@@ -239,7 +238,7 @@ def handle_text_message(event: MessageEvent) -> None:
                 [
                     TextMessage(
                         text=_建立說明文字(source_type, is_group_manager),
-                        quickReply=build_language_menu_quick_reply(),
+                        quickReply=None,
                         quoteToken=None,
                     ),
                     build_main_menu_card(source_type=source_type, is_group_manager=is_group_manager),

@@ -9,7 +9,6 @@ from linebot.v3.messaging import (  # 匯入 Flex 訊息元件
 )
 
 from app.core.languages import SUPPORTED_LANGUAGES  # 匯入語言設定
-from app.ui.language_menu import build_language_menu_quick_reply  # 匯入語言快速選單
 
 
 LANGUAGE_MENU_ITEMS = [
@@ -17,6 +16,8 @@ LANGUAGE_MENU_ITEMS = [
     ("US", "英文", "英文", "en"),
     ("TH", "泰文", "泰文", "th"),
     ("VN", "越南文", "越南文", "vi"),
+    ("MM", "緬甸文", "緬甸文", "my"),
+    ("KR", "韓文", "韓文", "ko"),
     ("ID", "印尼文", "印尼文", "id"),
     ("JP", "日文", "日文", "ja"),
     ("RU", "俄文", "俄文", "ru"),
@@ -82,7 +83,7 @@ def build_main_menu_card(source_type: str, is_group_manager: bool) -> FlexMessag
     return FlexMessage(
         altText="翻翻君主選單",
         contents=bubble,
-        quickReply=build_language_menu_quick_reply(),
+        quickReply=None,
     )  # 回傳 Flex 主選單
 
 
@@ -153,5 +154,5 @@ def build_language_setting_card(selected_codes: list[str], source_type: str, can
     return FlexMessage(
         altText="翻翻君語言設定",
         contents=bubble,
-        quickReply=build_language_menu_quick_reply(),
+        quickReply=None,
     )  # 回傳語言設定卡片
