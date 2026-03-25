@@ -63,12 +63,6 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 init_db(app)
 
 # 初始化 LINE Bot API
-# if token or secret missing we still create the objects but log an error
-if not config.CHANNEL_ACCESS_TOKEN:
-    print('LINE channel access token is empty; make sure env var is set')
-if not config.CHANNEL_SECRET:
-    print('LINE channel secret is empty; make sure env var is set')
-
 line_bot_api = LineBotApi(config.CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(config.CHANNEL_SECRET.decode('utf-8') if isinstance(config.CHANNEL_SECRET, bytes) else config.CHANNEL_SECRET)
 
@@ -270,32 +264,19 @@ def verify_webhook_signature(signature, body_text):
         return False, None
 
 
-# legacy route for backwards compatibility
-@app.route("/callback", methods=['POST'])
-def callback():
-    """老版 webhook 入口，直接轉發到 /webhook"""
-    # simply delegate to the new handler so old configurations still work
-    return webhook()
-
-
 @app.route("/webhook", methods=['POST'])
 def webhook():
     """LINE Webhook 入口（已優化：前置簽名驗證）"""
     # 1️⃣ 前置簽名驗證（不解析 JSON）
     signature = request.headers.get('X-Line-Signature', '')
     body_text = request.get_data(as_text=True)
-
-    print(f"📬 webhook hit, signature={signature} body={body_text[:200]}")
     
     is_valid, body = verify_webhook_signature(signature, body_text)
     if not is_valid:
-        print("❌ invalid signature - rejecting request")
         return 'Invalid signature', 400
     
     # 2️⃣ 簽名驗證成功，處理事件
     events = body.get("events", [])
-    if not events:
-        print("⚠️ received webhook with no events")
     for event in events:
         try:
             handle_event(event)
@@ -381,8 +362,6 @@ def handle_postback(event, user_id, group_id):
 
 def handle_message(event, user_id, group_id):
     """處理訊息事件"""
-    # temporary debugging info
-    print(f"🔍 handling message event: {event}")
     msg_type = event['message'].get('type')
     if msg_type != 'text':
         return
@@ -390,7 +369,16 @@ def handle_message(event, user_id, group_id):
     text = event['message']['text'].strip()
     lower = text.lower()
 
-    # --- 優先處理指令/命令 ---
+    # 自動翻譯
+    auto_translate = data.get('auto_translate', {}).get(group_id, True)
+    if auto_translate:
+        langs = group_service.get_group_langs(group_id)
+        threading.Thread(
+            target=_async_translate_and_reply,
+            args=(event['replyToken'], text, list(langs), group_id),
+            daemon=True).start()
+        return
+
     # 手動翻譯指令 (!翻譯)
     if text.startswith('!翻譯'):
         text_to_translate = text[3:].strip()
@@ -412,16 +400,6 @@ def handle_message(event, user_id, group_id):
 
     if lower == '/選單':
         line_utils.create_reply_message(line_bot_api, event['replyToken'], language_selection_message(group_id))
-        return
-
-    # 自動翻譯（僅在沒有其他命令時）
-    auto_translate = data.get('auto_translate', {}).get(group_id, True)
-    if auto_translate:
-        langs = group_service.get_group_langs(group_id)
-        threading.Thread(
-            target=_async_translate_and_reply,
-            args=(event['replyToken'], text, list(langs), group_id),
-            daemon=True).start()
         return
 
 # ============== 其他路由 ==============

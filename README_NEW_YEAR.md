@@ -67,19 +67,13 @@ pip install -r requirements.txt
 ```
 
 ### 環境設定
-在 `.env` 檔案中設定（建議）：
+在 `.env` 檔案中設定：
 ```env
 CHANNEL_ACCESS_TOKEN=your_line_channel_token
-LINE_CHANNEL_ACCESS_TOKEN=your_line_channel_token
 CHANNEL_SECRET=your_line_channel_secret
-ADMIN_TOKEN=your_admin_token
-DATABASE_URL=postgresql://user:pass@host:5432/dbname
-PORT=5000
+DEEPL_API_KEY=your_deepl_api_key (可選)
+DATABASE_URL=your_database_url (可選)
 ```
-
-資料庫說明：
-- 若未設定 `DATABASE_URL`，系統會自動改用本機 SQLite（`instance/fanfan_vip.db`）
-- 若有設定 `DATABASE_URL`，會優先使用 PostgreSQL
 
 ### 啟動服務
 ```bash
@@ -92,39 +86,56 @@ python main.py
 
 #### 用戶指令
 ```
-/主選單                       - 顯示會員中心與可用操作
-/我的會員                     - 查看會員狀態與到期時間
-/兌換序號 FANVIPXXXXXXXXXX    - 啟用或續期會員
-直接貼上 FANVIPXXXXXXXXXX      - 等同兌換序號
+/選單          - 開啟翻譯設定選單
+/menu          - 同上
+語音翻譯        - 切換語音翻譯開關
+自動翻譯        - 切換自動翻譯開關
+!翻譯 [文字]   - 手動翻譯指定文字
+我的id         - 查看自己的 User ID
 ```
 
-#### 管理者指令（僅主人）
+#### 管理員指令
 ```
-/產生序號 5 30天              - 產生 5 組 30 天序號
-/序號 5 30天                  - 舊寫法相容
+/指令          - 顯示管理選單
+/狀態          - 查看系統狀態
+/統計          - 查看翻譯統計
+/記憶體        - 查看記憶體使用
+/流量          - 查看今日流量
+/重啟          - 重啟系統
 ```
 
-#### 管理 API（需 ADMIN_TOKEN）
+#### 功能管理指令（僅主人）
 ```
-POST /admin/generate_codes
-GET  /admin/codes
-GET  /admin/export_codes
-POST /admin/run_expiry_check
+/功能設定      - 查看群組功能狀態
+/設定功能 [功能名] - 開啟/關閉功能
+/生成token     - 生成群組 TOKEN
 ```
 
 ### 使用範例
 
-#### 新用戶啟用流程
-1. 在 LINE 輸入 `/主選單`
-2. 輸入 `/兌換序號 FANVIPXXXXXXXXXX`
-3. 輸入 `/我的會員` 確認到期時間
+#### 設定翻譯語言
+1. 在群組中輸入 `/選單`
+2. 點選要翻譯的目標語言
+3. 可複選多個語言
+4. 使用「重設」清除所有設定
 
-#### 管理者發序號流程
+#### 功能分級管理
 ```bash
-/產生序號 10 30天
-```
+# 查看當前功能
+/功能設定
 
-系統會回覆可直接使用的序號清單。
+# 設定為基礎版
+/設定功能 voice          # 關閉語音
+/設定功能 statistics     # 關閉統計
+
+# 設定為專業版
+/設定功能 voice          # 開啟語音
+/設定功能 statistics     # 開啟統計
+/設定功能 admin          # 開啟管理
+
+# 生成 TOKEN
+/生成token
+```
 
 ## 🎁 商業方案建議
 
