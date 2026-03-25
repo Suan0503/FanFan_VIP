@@ -17,8 +17,6 @@ LANGUAGE_MENU_ITEMS = [
     ("US", "英文", "英文", "en"),
     ("TH", "泰文", "泰文", "th"),
     ("VN", "越南文", "越南文", "vi"),
-    ("MM", "緬甸文", "緬甸文", "my"),
-    ("KR", "韓文", "韓文", "ko"),
     ("ID", "印尼文", "印尼文", "id"),
     ("JP", "日文", "日文", "ja"),
     ("RU", "俄文", "俄文", "ru"),
@@ -90,7 +88,7 @@ def build_main_menu_card(source_type: str, is_group_manager: bool) -> FlexMessag
 
 def build_language_setting_card(selected_codes: list[str], source_type: str, can_manage_group: bool) -> FlexMessage:
     title = "群組翻譯設定" if source_type == "group" else "個人翻譯設定"  # 卡片標題
-    subtitle = "請加上 / 取消翻譯語言，可複選。" if source_type == "group" else "請選擇要翻譯成的語言。"  # 卡片副標
+    subtitle = "請加上 / 取消要翻譯成的語言，可複選。" if source_type == "group" else "請選擇要翻譯成的語言。"  # 卡片副標
 
     selected_labels = [name for name, code in SUPPORTED_LANGUAGES.items() if code in selected_codes]  # 已選語言名稱
     selected_text = "、".join(selected_labels) if selected_labels else "尚未設定"  # 已選語言摘要
@@ -129,10 +127,11 @@ def build_language_setting_card(selected_codes: list[str], source_type: str, can
         header=FlexBox(
             layout="vertical",
             paddingAll="18px",
-            backgroundColor="#F9F4F6",
+            backgroundColor="#F8F3F5",
             contents=[
                 FlexText(text=f"🎎 {title}", weight="bold", size="xl", color="#D9144E"),
                 FlexText(text=subtitle, size="sm", color="#5B4F57", wrap=True, margin="sm"),
+                FlexText(text="🎉 新年快樂 🎉", size="sm", color="#D9A300", align="center", margin="sm"),
                 FlexText(text=f"目前勾選：{selected_text}", size="sm", color="#D9144E", wrap=True, margin="md"),
             ],
         ),
@@ -146,7 +145,7 @@ def build_language_setting_card(selected_codes: list[str], source_type: str, can
             layout="vertical",
             paddingAll="12px",
             contents=[
-                FlexText(text=permission_hint, size="xs", color="#6F6B6B", wrap=True),
+                FlexText(text=f"✅ {permission_hint}", size="xs", color="#6F6B6B", wrap=True),
             ],
         ),
     )  # 建立語言設定卡片

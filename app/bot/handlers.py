@@ -11,7 +11,7 @@ from linebot.v3.messaging import (
 from linebot.v3.webhooks import FollowEvent, JoinEvent, MessageEvent, TextMessageContent  # 匯入事件型別
 
 from app.core.config import settings  # 匯入設定
-from app.core.languages import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE_CODE, DEFAULT_LANGUAGE_LABEL  # 匯入語言設定
+from app.core.languages import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE_CODE, DEFAULT_LANGUAGE_LABEL, LANGUAGE_DISPLAY  # 匯入語言設定
 from app.db.session import SessionLocal  # 匯入資料庫 Session
 from app.repositories.user_repository import get_user_by_line_id, create_user, update_user_language  # 匯入使用者存取
 from app.repositories.group_repository import (
@@ -50,6 +50,10 @@ def _語言代碼轉名稱(language_code: str) -> str:
     return f"未知語言({language_code})"  # 找不到時保留代碼
 
 
+def _語言代碼轉旗幟與名稱(language_code: str) -> tuple[str, str]:
+    return LANGUAGE_DISPLAY.get(language_code, ("🏳️", _語言代碼轉名稱(language_code)))  # 回傳旗幟與語言名稱
+
+
 def _語言名稱轉代碼(language_label: str) -> str | None:
     return SUPPORTED_LANGUAGES.get(language_label)  # 由中文語言名稱轉代碼
 
@@ -65,6 +69,14 @@ def _群組語言摘要(language_codes: list[str]) -> str:
         return "(無)"  # 防禦性回傳
     labels = [_語言代碼轉名稱(code) for code in language_codes]  # 轉成語言名稱
     return "、".join(labels)  # 組合摘要文字
+
+
+def _格式化語言更新訊息(language_codes: list[str]) -> str:
+    lines = ["✅ 已更新翻譯語言！", "", "目前設定語言："]  # 訊息標頭
+    for code in language_codes:
+        flag, name = _語言代碼轉旗幟與名稱(code)  # 轉換顯示資訊
+        lines.append(f"{flag} {name} ({code})")  # 加入語言列
+    return "\n".join(lines)  # 組合完整訊息
 
 
 def _標準化指令文字(text: str) -> str:
@@ -272,7 +284,7 @@ def handle_text_message(event: MessageEvent) -> None:
                 _reply_messages(
                     reply_token,
                     [
-                        TextMessage(text=f"群組翻譯語言已更新：{_群組語言摘要(updated_codes)}", quickReply=None, quoteToken=None),
+                        TextMessage(text=_格式化語言更新訊息(updated_codes), quickReply=None, quoteToken=None),
                         build_language_setting_card(updated_codes, source_type, True),
                     ],
                 )  # 顯示更新後小卡
@@ -280,22 +292,40 @@ def handle_text_message(event: MessageEvent) -> None:
 
             if user:
                 update_user_language(db, user, selected_codes[0])  # 更新個人語言（單語）
-            _reply_text(reply_token, f"個人翻譯語言已設定為：{selected_labels[0]}")  # 回覆成功
-            return
-
-        if source_type == "group" and group_id and text in 重設翻譯指令:
-            group = current_group or create_group(db, group_id)  # 取得群組資料
-            if not can_manage_group(group, user, user_id):
-                _reply_text(reply_token, "此指令僅限邀請者代表/管理員/所有者使用。")  # 權限不足
-                return
-            updated_codes = reset_group_languages(db, group_id)  # 重設群組翻譯語言
             _reply_messages(
                 reply_token,
                 [
-                    TextMessage(text=f"群組翻譯語言已重設：{_群組語言摘要(updated_codes)}", quickReply=None, quoteToken=None),
-                    build_language_setting_card(updated_codes, source_type, True),
+                    TextMessage(text=_格式化語言更新訊息([selected_codes[0]]), quickReply=None, quoteToken=None),
+                    build_language_setting_card([selected_codes[0]], source_type, True),
                 ],
-            )  # 回覆重設成功並顯示小卡
+            )  # 個人模式更新語言與顯示小卡
+            return
+
+        if text in 重設翻譯指令:
+            if source_type == "group" and group_id:
+                group = current_group or create_group(db, group_id)  # 取得群組資料
+                if not can_manage_group(group, user, user_id):
+                    _reply_text(reply_token, "此指令僅限邀請者代表/管理員/所有者使用。")  # 權限不足
+                    return
+                updated_codes = reset_group_languages(db, group_id)  # 重設群組翻譯語言
+                _reply_messages(
+                    reply_token,
+                    [
+                        TextMessage(text=_格式化語言更新訊息(updated_codes), quickReply=None, quoteToken=None),
+                        build_language_setting_card(updated_codes, source_type, True),
+                    ],
+                )  # 回覆重設成功並顯示小卡
+                return
+
+            if user:
+                update_user_language(db, user, DEFAULT_LANGUAGE_CODE)  # 重設個人翻譯語言
+            _reply_messages(
+                reply_token,
+                [
+                    TextMessage(text=_格式化語言更新訊息([DEFAULT_LANGUAGE_CODE]), quickReply=None, quoteToken=None),
+                    build_language_setting_card([DEFAULT_LANGUAGE_CODE], source_type, True),
+                ],
+            )  # 個人模式重設成功並顯示小卡
             return
 
         if source_type == "group" and group_id and text in 管理員白名單指令:
@@ -344,8 +374,8 @@ def handle_text_message(event: MessageEvent) -> None:
                     translated_text = translate_text(text, language_code)  # 逐語言翻譯
                 except Exception:
                     translated_text = text  # 單一語言失敗時保留原文
-                translated_lines.append(f"【{_語言代碼轉名稱(language_code)}】\n{translated_text}")  # 組合單語結果
-            _reply_text(reply_token, "\n\n".join(translated_lines))  # 回覆多語翻譯
+                translated_lines.append(f"[{language_code}] {translated_text}")  # 組合單語結果
+            _reply_text(reply_token, "\n".join(translated_lines))  # 回覆多語翻譯
             return
         elif user:
             target_code = user.target_language  # 採用個人語言
