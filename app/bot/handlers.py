@@ -340,7 +340,10 @@ def handle_text_message(event: MessageEvent) -> None:
             target_codes = get_group_languages(db, group_id)  # 採用群組多語設定
             translated_lines: list[str] = []  # 群組多語翻譯結果
             for language_code in target_codes:
-                translated_text = translate_text(text, language_code)  # 逐語言翻譯
+                try:
+                    translated_text = translate_text(text, language_code)  # 逐語言翻譯
+                except Exception:
+                    translated_text = text  # 單一語言失敗時保留原文
                 translated_lines.append(f"【{_語言代碼轉名稱(language_code)}】\n{translated_text}")  # 組合單語結果
             _reply_text(reply_token, "\n\n".join(translated_lines))  # 回覆多語翻譯
             return
