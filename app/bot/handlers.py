@@ -45,6 +45,13 @@ def _語言代碼轉名稱(language_code: str) -> str:
     return f"未知語言({language_code})"  # 找不到時保留代碼
 
 
+def _標準化指令文字(text: str) -> str:
+    normalized = text.strip()  # 清理首尾空白
+    while normalized.startswith(("/", "／")):
+        normalized = normalized[1:].strip()  # 移除開頭斜線
+    return normalized  # 回傳正規化後指令
+
+
 def _建立說明文字(source_type: str, is_group_manager: bool) -> str:
     lines = [
         "翻翻君指令說明：",
@@ -153,7 +160,7 @@ def handle_text_message(event: MessageEvent) -> None:
     if not reply_token:
         return  # 無法回覆就跳過
 
-    text = getattr(event.message, "text", "").strip()  # 取得文字內容
+    text = _標準化指令文字(getattr(event.message, "text", ""))  # 取得並正規化文字內容
     source_type = getattr(event.source, "type", "")  # 來源型別
     user_id = getattr(event.source, "user_id", None)  # 來源使用者
     group_id = getattr(event.source, "group_id", None) if source_type == "group" else None  # 來源群組

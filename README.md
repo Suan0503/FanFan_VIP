@@ -49,11 +49,21 @@ uvicorn app.main:app --reload
 1. 專案推到 GitHub
 2. Railway 建立新專案並連結 GitHub Repo
 3. 設定環境變數：
-   - `LINE_CHANNEL_ACCESS_TOKEN`
-   - `LINE_CHANNEL_SECRET`
+  - `LINE_CHANNEL_ACCESS_TOKEN`（也相容你目前的 `CHANNEL_ACCESS_TOKEN`）
+  - `LINE_CHANNEL_SECRET`（也相容你目前的 `CHANNEL_SECRET`）
+  - `DEEPL_API_KEY`
    - `APP_OWNER_USER_IDS`
   - `DATABASE_URL`（請使用 Railway Postgres 的 `DATABASE_URL` 變數參照）
 4. Deploy 後把 `https://你的網址/webhook/line` 設為 LINE Webhook URL
+
+### LINE 沒反應時優先檢查
+
+- Railway 是否已有 `CHANNEL_ACCESS_TOKEN` / `CHANNEL_SECRET` 或 `LINE_CHANNEL_ACCESS_TOKEN` / `LINE_CHANNEL_SECRET`
+- 是否已設定 `DATABASE_URL`
+- 是否已設定 `DEEPL_API_KEY`
+- LINE Developers 的 Webhook URL 是否指向 `https://你的網域/webhook/line`
+- LINE Official Account Manager 是否已開啟 Webhook
+- 現在支援 `/選單`、`/主選單`、`/指令說明` 這類斜線輸入
 
 ### Railway 資料庫連線重點
 
