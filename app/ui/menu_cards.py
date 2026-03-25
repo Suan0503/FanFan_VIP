@@ -2,8 +2,8 @@ from linebot.v3.messaging import (  # 匯入 Flex 訊息元件
     FlexBox,
     FlexBubble,
     FlexButton,
-    FlexCarousel,
     FlexMessage,
+    FlexSeparator,
     FlexText,
     MessageAction,
 )
@@ -12,106 +12,78 @@ from app.core.languages import SUPPORTED_LANGUAGES  # 匯入語言設定
 from app.ui.language_menu import build_language_menu_quick_reply  # 匯入語言快速選單
 
 
-def _build_menu_bubble(title: str, subtitle: str, description: str, primary_label: str, primary_text: str, secondary_label: str | None = None, secondary_text: str | None = None, accent_color: str = "#5B6CFF") -> FlexBubble:
-    footer_contents = [
-        FlexButton(
-            style="primary",
-            color=accent_color,
-            action=MessageAction(label=primary_label, text=primary_text),
-            height="sm",
-        )
-    ]  # 主要按鈕
+LANGUAGE_MENU_ITEMS = [
+    ("TW", "中文(台灣)", "中文", "zh-TW"),
+    ("US", "英文", "英文", "en"),
+    ("TH", "泰文", "泰文", "th"),
+    ("VN", "越南文", "越南文", "vi"),
+    ("MM", "緬甸文", "緬甸文", "my"),
+    ("KR", "韓文", "韓文", "ko"),
+    ("ID", "印尼文", "印尼文", "id"),
+    ("JP", "日文", "日文", "ja"),
+    ("RU", "俄文", "俄文", "ru"),
+]  # 語言按鈕顯示設定
 
-    if secondary_label and secondary_text:
-        footer_contents.append(
-            FlexButton(
-                style="secondary",
-                action=MessageAction(label=secondary_label, text=secondary_text),
-                height="sm",
-                margin="md",
-            )
-        )  # 次要按鈕
 
-    return FlexBubble(
-        size="mega",
+def _build_feature_button(label: str, command_text: str, color: str = "#4D62F4") -> FlexButton:
+    return FlexButton(
+        style="primary",
+        color=color,
+        action=MessageAction(label=label, text=command_text),
+        height="sm",
+        margin="sm",
+    )  # 建立主選單按鈕
+
+
+def build_main_menu_card(source_type: str, is_group_manager: bool) -> FlexMessage:
+    group_tip = "群組中可複選語言，之後每句都會固定翻譯。"  # 群組功能描述
+    group_action = "查看群組設定"  # 群組按鈕預設動作
+    group_label = "👥 查看群組設定"  # 群組按鈕預設文字
+
+    if source_type != "group":
+        group_tip = "把翻翻君加入群組後，可開啟群組多語翻譯。"  # 個人聊天提示
+        group_action = "指令說明"  # 個人聊天無群組設定
+        group_label = "👥 群組功能說明"  # 個人聊天按鈕文字
+    elif not is_group_manager:
+        group_tip = "尚未取得群組設定權限，請先輸入：綁定邀請者"  # 權限不足提示
+        group_action = "綁定邀請者"  # 直接提供綁定入口
+        group_label = "🔐 綁定邀請者"  # 權限不足按鈕
+
+    bubble = FlexBubble(
+        size="giga",
         header=FlexBox(
             layout="vertical",
-            paddingAll="20px",
-            backgroundColor=accent_color,
+            paddingAll="18px",
+            backgroundColor="#F3F6FF",
             contents=[
-                FlexText(text=subtitle, color="#FFFFFFCC", size="sm", weight="bold"),
-                FlexText(text=title, color="#FFFFFF", size="xl", weight="bold", margin="sm", wrap=True),
+                FlexText(text="翻翻君 VIP 功能選單", size="xl", weight="bold", color="#344054"),
+                FlexText(text="翻譯、語言設定、群組管理一鍵操作", size="sm", color="#667085", margin="sm", wrap=True),
             ],
         ),
         body=FlexBox(
             layout="vertical",
-            paddingAll="20px",
-            spacing="md",
+            spacing="sm",
+            paddingAll="16px",
             contents=[
-                FlexText(text=description, wrap=True, color="#333333", size="sm"),
+                _build_feature_button("🎯 語言翻譯設定", "語言設定", "#5569F5"),
+                _build_feature_button("📘 指令使用說明", "指令說明", "#17B26A"),
+                _build_feature_button(group_label, group_action, "#F79009"),
+                _build_feature_button("🔄 重設翻譯設定", "重設翻譯設定", "#98A2B3") if source_type == "group" else _build_feature_button("🧭 開啟主選單", "主選單", "#98A2B3"),
             ],
         ),
         footer=FlexBox(
             layout="vertical",
-            spacing="sm",
-            paddingAll="16px",
-            contents=footer_contents,
+            paddingAll="12px",
+            contents=[
+                FlexSeparator(margin="none"),
+                FlexText(text=group_tip, size="xs", color="#667085", wrap=True, margin="md"),
+            ],
         ),
-    )  # 建立單張選單卡
-
-
-def build_main_menu_card(source_type: str, is_group_manager: bool) -> FlexMessage:
-    group_description = "可綁定邀請者、查看本群設定。"  # 預設群組描述
-    group_secondary_label = "查看群組設定"  # 預設群組次按鈕
-    group_secondary_text = "查看群組設定"  # 預設群組次動作
-
-    if source_type != "group":
-        group_description = "群組功能需把翻翻君加入 LINE 群組後才能使用。"  # 個人聊天提示
-        group_secondary_label = "指令說明"  # 個人聊天改成說明
-        group_secondary_text = "指令說明"  # 個人聊天改成說明
-    elif not is_group_manager:
-        group_description = "先輸入綁定邀請者；之後僅邀請者代表、管理員、所有者可管理。"  # 未授權群組提示
-        group_secondary_label = "綁定邀請者"  # 未授權時提供綁定入口
-        group_secondary_text = "綁定邀請者"  # 未授權時提供綁定入口
-
-    carousel = FlexCarousel(
-        contents=[
-            _build_menu_bubble(
-                title="語言設定",
-                subtitle="翻譯功能",
-                description="快速選擇中文、英文、泰文、越南文、緬甸文、韓文、印尼文、日文、俄文。",
-                primary_label="開啟語言",
-                primary_text="語言設定",
-                secondary_label="設為英文",
-                secondary_text="設定語言 英文",
-                accent_color="#5B6CFF",
-            ),
-            _build_menu_bubble(
-                title="使用說明",
-                subtitle="功能導覽",
-                description="查看全部中文指令、操作方式與群組權限規則。",
-                primary_label="查看說明",
-                primary_text="指令說明",
-                secondary_label="開啟主選單",
-                secondary_text="主選單",
-                accent_color="#00A889",
-            ),
-            _build_menu_bubble(
-                title="群組管理",
-                subtitle="權限設定",
-                description=group_description,
-                primary_label="群組功能",
-                primary_text="綁定邀請者" if source_type == "group" else "指令說明",
-                secondary_label=group_secondary_label,
-                secondary_text=group_secondary_text,
-                accent_color="#FF8A3D",
-            ),
-        ]
-    )  # 建立輪播小卡
+    )  # 建立主選單卡片
 
     return FlexMessage(
         altText="翻翻君主選單",
-        contents=carousel,
+        contents=bubble,
         quickReply=build_language_menu_quick_reply(),
     )  # 回傳 Flex 主選單
 
@@ -129,15 +101,15 @@ def build_language_setting_card(selected_codes: list[str], source_type: str, can
         permission_hint = "點擊下方語言按鈕即可切換勾選狀態。"  # 操作提示
 
     button_contents = []  # 語言按鈕列表
-    for language_name, language_code in SUPPORTED_LANGUAGES.items():
+    for tag, pretty_name, command_name, language_code in LANGUAGE_MENU_ITEMS:
         is_selected = language_code in selected_codes  # 是否已勾選
-        label_prefix = "✅ " if is_selected else "☐ "  # 勾選狀態圖示
-        action_text = f"設定語言 {language_name}"  # 點擊送出的指令
+        label_text = f"✅ {tag} {pretty_name}" if is_selected else f"{tag} {pretty_name}"  # 文字樣式
+        action_text = f"設定語言 {command_name}"  # 點擊送出的指令
         button_contents.append(
             FlexButton(
-                style="primary" if is_selected else "secondary",
+                style="primary",
                 color="#D9144E" if is_selected else "#FF6B57",
-                action=MessageAction(label=f"{label_prefix}{language_name}", text=action_text),
+                action=MessageAction(label=label_text, text=action_text),
                 height="sm",
                 margin="sm",
             )
@@ -157,10 +129,10 @@ def build_language_setting_card(selected_codes: list[str], source_type: str, can
         header=FlexBox(
             layout="vertical",
             paddingAll="18px",
-            backgroundColor="#F6EEF1",
+            backgroundColor="#F9F4F6",
             contents=[
                 FlexText(text=f"🎎 {title}", weight="bold", size="xl", color="#D9144E"),
-                FlexText(text=subtitle, size="sm", color="#564A4A", wrap=True, margin="sm"),
+                FlexText(text=subtitle, size="sm", color="#5B4F57", wrap=True, margin="sm"),
                 FlexText(text=f"目前勾選：{selected_text}", size="sm", color="#D9144E", wrap=True, margin="md"),
             ],
         ),
