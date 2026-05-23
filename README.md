@@ -81,6 +81,7 @@ uvicorn app.main:app --reload
 - 本專案會在啟動時自動建表（`user_profiles`、`group_settings`）
 - 支援 Railway 常見連線格式：`postgres://...` 或 `postgresql://...`
 - 系統會自動轉為 SQLAlchemy 可用格式並補上 `sslmode=require`
+- 如果你只是先把 `.env.example` 複製成 `.env`，裡面的占位 `DATABASE_URL` 會自動回退成本機 `sqlite:///./translator.db`，讓服務先能啟動
 
 ## 舊版核心遷移說明
 
