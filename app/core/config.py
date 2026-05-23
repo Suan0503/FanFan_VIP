@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     line_channel_access_token: str = Field(default="", validation_alias=AliasChoices("LINE_CHANNEL_ACCESS_TOKEN", "CHANNEL_ACCESS_TOKEN"))  # LINE Token
     line_channel_secret: str = Field(default="", validation_alias=AliasChoices("LINE_CHANNEL_SECRET", "CHANNEL_SECRET"))  # LINE Secret
     deepl_api_key: str = Field(default="", validation_alias=AliasChoices("DEEPL_API_KEY", "DEEPL_AUTH_KEY"))  # DeepL API Key
+    translation_channel: str = Field(default="deepl", validation_alias=AliasChoices("TRANSLATION_CHANNEL"))  # 翻譯預設通道
     app_owner_user_ids: str = Field(default="", validation_alias=AliasChoices("APP_OWNER_USER_IDS"))  # 所有者 ID 字串
     database_url: str = Field(default="sqlite:///./translator.db", validation_alias=AliasChoices("DATABASE_URL"))  # 資料庫連線
 

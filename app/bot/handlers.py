@@ -34,8 +34,8 @@ from app.fanfan_core.menu_builder import build_legacy_language_setting_card  # �
 configuration = Configuration(access_token=settings.line_channel_access_token)  # 建立 LINE API 設定
 line_handler = WebhookHandler(settings.line_channel_secret)  # 建立 webhook handler
 
-語言選單指令 = {"語言設定", "語言選單", "選單"}  # 中文語言選單指令
-主選單指令 = {"主選單", "功能選單", "選單小卡"}  # 中文主選單小卡指令
+語言選單指令 = {"語言設定", "語言選單"}  # 中文語言選單指令
+主選單指令 = {"主選單", "功能選單", "選單小卡", "選單", "menu"}  # 主選單指令（含斜線正規化）
 綁定邀請者指令 = "綁定邀請者"  # 綁定邀請者代表指令
 管理員白名單指令 = {"查看群組設定", "重設邀請者"}  # 僅管理者可用的群組指令
 說明指令 = {"指令說明", "使用說明", "幫助"}  # 顯示說明指令
@@ -66,26 +66,29 @@ def _標準化指令文字(text: str) -> str:
 def _建立說明文字(source_type: str, is_group_manager: bool) -> str:
     lines = [
         "翻翻君指令說明：",
-        "1. 語言設定 / 語言選單 / 選單",
+        "1. /選單 /menu /主選單",
+        "   開啟主選單（Flex 卡片）。",
+        "2. 語言設定 / 語言選單",
         "   開啟語言快速選單。",
-        "2. 設定語言 中文",
+        "3. 設定語言 中文",
         "   個人聊天可切換單一翻譯語言。",
-        "3. 指令說明 / 使用說明 / 幫助",
+        "4. 指令說明 / 使用說明 / 幫助",
         "   顯示這份說明。",
+        "5. 預設翻譯通道：DeepL（失敗時自動備援）。",
     ]  # 基礎說明
 
     if source_type == "group":
         lines.extend(
             [
-                "4. 綁定邀請者",
+                "6. 綁定邀請者",
                 "   由群組第一位綁定者成為邀請者代表。",
-                "5. 設定語言 中文、泰文",
+                "7. 設定語言 中文、泰文",
                 "   群組可複選語言，之後每句都會翻譯成多語。",
-                "6. 重設翻譯設定",
+                "8. 重設翻譯設定",
                 "   把群組翻譯語言重設成中文。",
-                "7. 查看群組設定",
+                "9. 查看群組設定",
                 "   查看本群翻譯語言與邀請者代表。",
-                "8. 重設邀請者",
+                "10. 重設邀請者",
                 "   把邀請者代表改成目前發送指令的人。",
             ]
         )  # 群組指令
@@ -128,11 +131,16 @@ def handle_follow(event: FollowEvent) -> None:
             user = create_user(db, user_id, member_code, DEFAULT_LANGUAGE_CODE)  # 建立使用者資料
 
     message = (
-        f"感謝使用翻翻君！\n您的個人編號：{user.member_code}\n"
-        f"目前翻譯語言：{DEFAULT_LANGUAGE_LABEL}\n"
-        "可直接傳送文字，我會自動翻譯。\n"
-        "你也可以點下方主選單小卡快速操作。"
-    )  # 組合歡迎訊息
+        "歡迎加入翻翻君 VIP！\n"
+        f"你的會員編號：{user.member_code}\n"
+        f"預設翻譯語言：{DEFAULT_LANGUAGE_LABEL}\n"
+        "預設翻譯通道：DeepL\n\n"
+        "快速上手：\n"
+        "1. 直接傳訊息，我會即時翻譯\n"
+        "2. 輸入 /選單 或 /menu 開啟功能選單\n"
+        "3. 輸入 語言設定 可切換常用語言\n"
+        "4. 輸入 指令說明 查看完整教學"
+    )  # 組合歡迎與教學訊息
     _reply_messages(
         reply_token,
         [
@@ -160,7 +168,7 @@ def handle_join(event: JoinEvent) -> None:
         reply_token,
         [
             TextMessage(
-                text="翻翻君已加入群組！\n請邀請者輸入：綁定邀請者\n完成後僅邀請者代表、管理員、所有者可修改群組翻譯設定。",
+                text="翻翻君已加入群組！\n請先輸入 /選單 或 /menu 開啟功能選單。\n若要管理群組語言，請邀請者再輸入：綁定邀請者。",
                 quickReply=None,
                 quoteToken=None,
             ),
@@ -176,6 +184,7 @@ def handle_text_message(event: MessageEvent) -> None:
         return  # 無法回覆就跳過
 
     text = _標準化指令文字(getattr(event.message, "text", ""))  # 取得並正規化文字內容
+    text_for_command = text.lower()  # 英文指令以小寫比對
     source_type = getattr(event.source, "type", "")  # 來源型別
     user_id = getattr(event.source, "user_id", None)  # 來源使用者
     group_id = getattr(event.source, "group_id", None) if source_type == "group" else None  # 來源群組
@@ -189,7 +198,7 @@ def handle_text_message(event: MessageEvent) -> None:
         current_group = get_group(db, group_id) if group_id else None  # 先讀取群組資料供說明與權限判斷使用
         is_group_manager = bool(current_group and can_manage_group(current_group, user, user_id))  # 是否具備群組管理權限
 
-        if text in 語言選單指令:
+        if text_for_command in 語言選單指令:
             selected_codes = get_group_languages(db, group_id) if group_id else [user.target_language] if user else [DEFAULT_LANGUAGE_CODE]  # 取得目前勾選語言
             _reply_messages(
                 reply_token,
@@ -200,7 +209,7 @@ def handle_text_message(event: MessageEvent) -> None:
             )  # 顯示語言設定小卡
             return
 
-        if text in 主選單指令:
+        if text_for_command in 主選單指令:
             _reply_messages(
                 reply_token,
                 [
@@ -210,7 +219,7 @@ def handle_text_message(event: MessageEvent) -> None:
             )  # 顯示主選單小卡
             return
 
-        if text in 說明指令:
+        if text_for_command in 說明指令:
             _reply_messages(
                 reply_token,
                 [
@@ -274,7 +283,7 @@ def handle_text_message(event: MessageEvent) -> None:
             )  # 個人模式更新語言與顯示小卡
             return
 
-        if text in 重設翻譯指令:
+        if text_for_command in 重設翻譯指令:
             if source_type == "group" and group_id:
                 group = current_group or create_group(db, group_id)  # 取得群組資料
                 if not can_manage_group(group, user, user_id):
@@ -301,7 +310,7 @@ def handle_text_message(event: MessageEvent) -> None:
             )  # 個人模式重設成功並顯示小卡
             return
 
-        if source_type == "group" and group_id and text in 管理員白名單指令:
+        if source_type == "group" and group_id and text_for_command in 管理員白名單指令:
             group = current_group or create_group(db, group_id)  # 取得群組資料
             if not can_manage_group(group, user, user_id):
                 _reply_text(reply_token, "此指令僅限邀請者代表/管理員/所有者使用。")  # 白名單權限不足

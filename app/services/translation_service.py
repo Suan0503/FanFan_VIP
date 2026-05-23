@@ -75,14 +75,28 @@ def translate_text(text: str, target_language_code: str) -> str:
     if _is_non_translatable(clean_text):
         return clean_text  # 數字/代碼類內容直接回傳
 
-    try:
-        deepl_result = _translate_with_deepl(clean_text, target_language_code)  # 優先使用 DeepL
-        if deepl_result:
-            return deepl_result  # DeepL 成功時直接回傳
-    except Exception:
-        pass  # DeepL 發生任何錯誤時繼續走備援
+    preferred_channel = settings.translation_channel.strip().lower() or "deepl"  # 預設通道為 DeepL
+
+    if preferred_channel == "deepl":
+        try:
+            deepl_result = _translate_with_deepl(clean_text, target_language_code)  # 預設優先使用 DeepL
+            if deepl_result:
+                return deepl_result  # DeepL 成功時直接回傳
+        except Exception:
+            pass  # DeepL 發生任何錯誤時繼續走備援
 
     try:
-        return _translate_with_fallback(clean_text, target_language_code)  # 不支援語言時改用備援
+        fallback_result = _translate_with_fallback(clean_text, target_language_code)  # 不支援語言時改用備援
+        if fallback_result:
+            return fallback_result
     except Exception:
-        return clean_text  # 若翻譯失敗則回傳原文
+        pass  # 備援失敗時最後回傳原文
+
+    try:
+        deepl_result = _translate_with_deepl(clean_text, target_language_code)  # 非 deepl 偏好時仍保留二次嘗試
+        if deepl_result:
+            return deepl_result
+    except Exception:
+        pass
+
+    return clean_text  # 若翻譯失敗則回傳原文

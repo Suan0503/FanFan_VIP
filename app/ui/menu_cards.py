@@ -23,6 +23,15 @@ LANGUAGE_MENU_ITEMS = [
     ("RU", "俄文", "俄文", "ru"),
 ]  # 語言按鈕顯示設定
 
+POPULAR_LANGUAGE_BUTTONS = [
+    ("中文", "設定語言 中文"),
+    ("English", "設定語言 英文"),
+    ("日本語", "設定語言 日文"),
+    ("ไทย", "設定語言 泰文"),
+    ("Tiếng Việt", "設定語言 越南文"),
+    ("한국어", "設定語言 韓文"),
+]  # 熱門語言快捷
+
 
 def _build_feature_button(label: str, command_text: str, color: str = "#4D62F4") -> FlexButton:
     return FlexButton(
@@ -32,6 +41,16 @@ def _build_feature_button(label: str, command_text: str, color: str = "#4D62F4")
         height="sm",
         margin="sm",
     )  # 建立主選單按鈕
+
+
+def _build_language_chip(label: str, command_text: str) -> FlexButton:
+    return FlexButton(
+        style="primary",
+        color="#334155",
+        action=MessageAction(label=label, text=command_text),
+        margin="sm",
+        height="sm",
+    )  # 建立熱門語言快捷按鈕
 
 
 def build_main_menu_card(source_type: str, is_group_manager: bool) -> FlexMessage:
@@ -53,29 +72,52 @@ def build_main_menu_card(source_type: str, is_group_manager: bool) -> FlexMessag
         header=FlexBox(
             layout="vertical",
             paddingAll="18px",
-            backgroundColor="#F3F6FF",
+            backgroundColor="#0F172A",
             contents=[
-                FlexText(text="翻翻君 VIP 功能選單", size="xl", weight="bold", color="#344054"),
-                FlexText(text="翻譯、語言設定、群組管理一鍵操作", size="sm", color="#667085", margin="sm", wrap=True),
+                FlexText(text="FanFan VIP", size="xs", color="#93C5FD", weight="bold"),
+                FlexText(text="翻譯控制台", size="xxl", weight="bold", color="#F8FAFC", margin="sm"),
+                FlexText(text="輸入 /menu 或點按下方按鈕，立即調整翻譯體驗", size="sm", color="#CBD5E1", margin="md", wrap=True),
             ],
         ),
         body=FlexBox(
             layout="vertical",
             spacing="sm",
             paddingAll="16px",
+            backgroundColor="#F8FAFC",
             contents=[
-                _build_feature_button("🎯 語言翻譯設定", "語言設定", "#5569F5"),
-                _build_feature_button("📘 指令使用說明", "指令說明", "#17B26A"),
-                _build_feature_button(group_label, group_action, "#F79009"),
-                _build_feature_button("🔄 重設翻譯設定", "重設翻譯設定", "#98A2B3") if source_type == "group" else _build_feature_button("🧭 開啟主選單", "主選單", "#98A2B3"),
+                _build_feature_button("語言設定", "語言設定", "#2563EB"),
+                _build_feature_button("指令教學", "指令說明", "#16A34A"),
+                _build_feature_button(group_label, group_action, "#EA580C"),
+                _build_feature_button("重設翻譯", "重設翻譯設定", "#64748B") if source_type == "group" else _build_feature_button("再次開啟選單", "選單", "#64748B"),
+                FlexSeparator(margin="md"),
+                FlexText(text="熱門語言快捷", size="sm", color="#0F172A", weight="bold", margin="md"),
+                FlexText(text="點一下就切換翻譯語言", size="xs", color="#475569", margin="sm"),
+                FlexBox(
+                    layout="horizontal",
+                    spacing="sm",
+                    contents=[
+                        _build_language_chip(POPULAR_LANGUAGE_BUTTONS[0][0], POPULAR_LANGUAGE_BUTTONS[0][1]),
+                        _build_language_chip(POPULAR_LANGUAGE_BUTTONS[1][0], POPULAR_LANGUAGE_BUTTONS[1][1]),
+                        _build_language_chip(POPULAR_LANGUAGE_BUTTONS[2][0], POPULAR_LANGUAGE_BUTTONS[2][1]),
+                    ],
+                ),
+                FlexBox(
+                    layout="horizontal",
+                    spacing="sm",
+                    contents=[
+                        _build_language_chip(POPULAR_LANGUAGE_BUTTONS[3][0], POPULAR_LANGUAGE_BUTTONS[3][1]),
+                        _build_language_chip(POPULAR_LANGUAGE_BUTTONS[4][0], POPULAR_LANGUAGE_BUTTONS[4][1]),
+                        _build_language_chip(POPULAR_LANGUAGE_BUTTONS[5][0], POPULAR_LANGUAGE_BUTTONS[5][1]),
+                    ],
+                ),
             ],
         ),
         footer=FlexBox(
             layout="vertical",
             paddingAll="12px",
+            backgroundColor="#E2E8F0",
             contents=[
-                FlexSeparator(margin="none"),
-                FlexText(text=group_tip, size="xs", color="#667085", wrap=True, margin="md"),
+                FlexText(text=group_tip, size="xs", color="#334155", wrap=True),
             ],
         ),
     )  # 建立主選單卡片
