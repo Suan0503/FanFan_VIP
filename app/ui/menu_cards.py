@@ -107,7 +107,7 @@ def _build_status_toggle_row(label: str, enabled: bool, on_command: str, off_com
                 style="primary",
                 color=toggle_color,
                 action=MessageAction(label=toggle_label, text=toggle_command),
-                cornerRadius="8px",
+                cornerRadius="4px",
                 height="sm",
                 flex=1,
             ),
