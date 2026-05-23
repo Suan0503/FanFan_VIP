@@ -39,7 +39,25 @@ line_handler = WebhookHandler(settings.line_channel_secret)  # 建立 webhook ha
 管理員白名單指令 = {"查看群組設定", "重設邀請者"}  # 僅管理者可用的群組指令
 說明指令 = {"指令說明", "使用說明", "幫助"}  # 顯示說明指令
 重設翻譯指令 = {"重設翻譯設定", "重設語言"}  # 重設群組翻譯語言
-自動偵測指令 = {"啟用自動偵測", "自動偵測"}  # 啟用非中文轉中文
+自動偵測啟用指令 = {"啟用自動偵測", "自動偵測"}  # 啟用非中文轉中文
+自動偵測關閉指令 = {"關閉自動偵測"}  # 關閉自動偵測
+即時翻譯啟用指令 = {"開啟即時翻譯"}  # 開啟即時翻譯
+即時翻譯關閉指令 = {"關閉即時翻譯"}  # 關閉即時翻譯
+
+即時翻譯狀態: dict[str, bool] = {}  # 依使用情境保存即時翻譯開關
+自動偵測狀態: dict[str, bool] = {}  # 依使用情境保存自動偵測開關
+
+
+def _狀態鍵(source_type: str, user_id: str | None, group_id: str | None) -> str:
+    if source_type == "group" and group_id:
+        return f"group:{group_id}"  # 群組模式鍵
+    return f"user:{user_id or 'anonymous'}"  # 個人模式鍵
+
+
+def _目前開關狀態(state_key: str, default_auto_detect: bool) -> tuple[bool, bool]:
+    translation_enabled = 即時翻譯狀態.get(state_key, True)  # 預設開啟即時翻譯
+    auto_detect_enabled = 自動偵測狀態.get(state_key, default_auto_detect)  # 預設依語言狀態決定
+    return translation_enabled, auto_detect_enabled
 
 
 def _語言代碼轉名稱(language_code: str) -> str:
@@ -211,6 +229,11 @@ def handle_text_message(event: MessageEvent) -> None:
 
         if text_for_command in 主選單指令:
             selected_codes = get_group_languages(db, group_id) if group_id else [user.target_language] if user else [DEFAULT_LANGUAGE_CODE]
+            state_key = _狀態鍵(source_type, user_id, group_id)
+            translation_enabled, auto_detect_enabled = _目前開關狀態(
+                state_key,
+                default_auto_detect=(source_type != "group" and (selected_codes[0] if selected_codes else DEFAULT_LANGUAGE_CODE) == DEFAULT_LANGUAGE_CODE),
+            )
             _reply_messages(
                 reply_token,
                 [
@@ -219,6 +242,8 @@ def handle_text_message(event: MessageEvent) -> None:
                         source_type=source_type,
                         is_group_manager=is_group_manager,
                         current_language_code=selected_codes[0] if selected_codes else DEFAULT_LANGUAGE_CODE,
+                        translation_enabled=translation_enabled,
+                        auto_detect_enabled=auto_detect_enabled,
                     ),
                 ],
             )  # 顯示主選單小卡
@@ -226,6 +251,11 @@ def handle_text_message(event: MessageEvent) -> None:
 
         if text_for_command in 說明指令:
             selected_codes = get_group_languages(db, group_id) if group_id else [user.target_language] if user else [DEFAULT_LANGUAGE_CODE]
+            state_key = _狀態鍵(source_type, user_id, group_id)
+            translation_enabled, auto_detect_enabled = _目前開關狀態(
+                state_key,
+                default_auto_detect=(source_type != "group" and (selected_codes[0] if selected_codes else DEFAULT_LANGUAGE_CODE) == DEFAULT_LANGUAGE_CODE),
+            )
             _reply_messages(
                 reply_token,
                 [
@@ -238,18 +268,38 @@ def handle_text_message(event: MessageEvent) -> None:
                         source_type=source_type,
                         is_group_manager=is_group_manager,
                         current_language_code=selected_codes[0] if selected_codes else DEFAULT_LANGUAGE_CODE,
+                        translation_enabled=translation_enabled,
+                        auto_detect_enabled=auto_detect_enabled,
                     ),
                 ],
             )  # 顯示指令說明與主選單小卡
             return
 
-        if text_for_command in 自動偵測指令:
+        state_key = _狀態鍵(source_type, user_id, group_id)
+
+        if text_for_command in 即時翻譯啟用指令:
+            即時翻譯狀態[state_key] = True
+            _reply_text(reply_token, "✅ 即時翻譯功能已開啟")
+            return
+
+        if text_for_command in 即時翻譯關閉指令:
+            即時翻譯狀態[state_key] = False
+            _reply_text(reply_token, "⛔ 即時翻譯功能已關閉")
+            return
+
+        if text_for_command in 自動偵測啟用指令:
             if user:
                 update_user_language(db, user, DEFAULT_LANGUAGE_CODE)  # 自動偵測模式預設翻成中文
+            自動偵測狀態[state_key] = True
             _reply_text(
                 reply_token,
                 "✅ 已啟用自動偵測模式\n現在會優先偵測語言，遇到非中文訊息會翻譯成中文。",
             )
+            return
+
+        if text_for_command in 自動偵測關閉指令:
+            自動偵測狀態[state_key] = False
+            _reply_text(reply_token, "⛔ 已關閉自動偵測模式")
             return
 
         if text.startswith("設定語言 "):
@@ -365,6 +415,15 @@ def handle_text_message(event: MessageEvent) -> None:
             _reply_text(reply_token, "邀請者代表綁定完成，現在你可管理本群翻譯語言。")  # 回覆成功
             return
 
+        translation_enabled, auto_detect_enabled = _目前開關狀態(
+            state_key,
+            default_auto_detect=(source_type != "group" and (user.target_language if user else DEFAULT_LANGUAGE_CODE) == DEFAULT_LANGUAGE_CODE),
+        )
+
+        if not translation_enabled:
+            _reply_text(reply_token, "⛔ 目前即時翻譯功能為關閉中\n可點選主選單中的開啟按鈕恢復翻譯。")
+            return
+
         target_code = DEFAULT_LANGUAGE_CODE  # 預設語言
         if source_type == "group" and group_id:
             group = current_group or create_group(db, group_id)  # 取得群組設定
@@ -375,7 +434,7 @@ def handle_text_message(event: MessageEvent) -> None:
         elif user:
             target_code = user.target_language  # 採用個人語言
 
-        if target_code == DEFAULT_LANGUAGE_CODE:
+        if auto_detect_enabled and target_code == DEFAULT_LANGUAGE_CODE:
             source_code = detect_source_language(text, [DEFAULT_LANGUAGE_CODE])  # 判斷是否已是中文
             if source_code == DEFAULT_LANGUAGE_CODE:
                 _reply_text(reply_token, f"翻譯結果：\n{text}")  # 中文原文直接回傳
