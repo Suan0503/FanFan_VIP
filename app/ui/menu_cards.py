@@ -85,7 +85,7 @@ def _build_language_chip(language_code: str, label: str, command_text: str, curr
 
 def _build_status_text(label: str, enabled: bool) -> FlexText:
     return FlexText(
-        text=f"{label} - {'啟用中(綠)' if enabled else '關閉中(紅)'}",
+        text=f"{label} - {'啟用中' if enabled else '關閉中'}",
         size="xs",
         color=THEME_SUCCESS if enabled else THEME_DANGER,
         margin="sm",
@@ -94,7 +94,7 @@ def _build_status_text(label: str, enabled: bool) -> FlexText:
 
 
 def _build_status_toggle_row(label: str, enabled: bool, on_command: str, off_command: str) -> FlexBox:
-    toggle_label = "關閉" if enabled else "開啟"
+    toggle_label = "關" if enabled else "開"
     toggle_command = off_command if enabled else on_command
     toggle_color = THEME_DANGER if enabled else THEME_SUCCESS
     return FlexBox(
@@ -107,9 +107,9 @@ def _build_status_toggle_row(label: str, enabled: bool, on_command: str, off_com
                 style="primary",
                 color=toggle_color,
                 action=MessageAction(label=toggle_label, text=toggle_command),
-                cornerRadius="10px",
+                cornerRadius="8px",
                 height="sm",
-                flex=0,
+                flex=1,
             ),
         ],
     )  # 建立狀態列與切換按鈕
