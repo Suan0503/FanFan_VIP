@@ -18,6 +18,11 @@ THEME_BG_DEEP = "#14213D"  # 主要區塊深藍
 THEME_GOLD = "#D4AF37"  # 強調金色
 THEME_MUTED = "#94A3B8"  # 輔助灰
 THEME_WHITE = "#F8FAFC"  # 文字亮色
+THEME_SUCCESS = "#22C55E"  # 啟用綠色
+THEME_DANGER = "#EF4444"  # 關閉紅色
+THEME_PERSONAL = "#1E3A8A"  # 個人模式主色
+THEME_PERSONAL_LIGHT = "#60A5FA"  # 個人模式淺藍
+THEME_GROUP = "#14213D"  # 群組模式深藍
 
 
 LANGUAGE_MENU_ITEMS = [
@@ -35,12 +40,12 @@ LANGUAGE_MENU_ITEMS = [
 QUICK_LANGUAGE_ITEMS = [
     ("zh-TW", "TW 中文(繁體)", "設定語言 中文"),
     ("en", "US 英文", "設定語言 英文"),
-    ("ja", "JP 日文", "設定語言 日文"),
     ("th", "TH 泰文", "設定語言 泰文"),
+    ("ja", "JP 日文", "設定語言 日文"),
     ("vi", "VN 越南文", "設定語言 越南文"),
     ("ko", "KR 韓文", "設定語言 韓文"),
-    ("my", "MM 緬甸文", "設定語言 緬甸文"),
     ("id", "ID 印尼文", "設定語言 印尼文"),
+    ("my", "MM 緬甸文", "設定語言 緬甸文"),
     ("ru", "RU 俄文", "設定語言 俄文"),
 ]  # 快速切換語言（雙欄）
 
@@ -55,10 +60,10 @@ def _language_label_by_code(language_code: str) -> str:
     return "未設定"  # 防禦性回傳
 
 
-def _build_feature_button(label: str, command_text: str) -> FlexButton:
+def _build_feature_button(label: str, command_text: str, button_color: str) -> FlexButton:
     return FlexButton(
         style="primary",
-        color=THEME_BG_DEEP,
+        color=button_color,
         action=MessageAction(label=label, text=command_text),
         cornerRadius="14px",
         height="sm",
@@ -78,7 +83,17 @@ def _build_language_chip(language_code: str, label: str, command_text: str, curr
     )  # 建立熱門語言雙欄卡片
 
 
-def _build_quick_language_section(current_language_code: str) -> list[FlexBox | FlexText | FlexSeparator | FlexButton]:
+def _build_status_text(label: str, enabled: bool) -> FlexText:
+    return FlexText(
+        text=f"{label} - {'啟用中(綠)' if enabled else '關閉中(紅)'}",
+        size="xs",
+        color=THEME_SUCCESS if enabled else THEME_DANGER,
+        margin="sm",
+        weight="bold",
+    )  # 建立狀態文字
+
+
+def _build_quick_language_section(current_language_code: str, mode_button_color: str) -> list[FlexBox | FlexText | FlexSeparator | FlexButton]:
     row_one = FlexBox(
         layout="horizontal",
         spacing="sm",
@@ -123,7 +138,7 @@ def _build_quick_language_section(current_language_code: str) -> list[FlexBox | 
     return [
         FlexSeparator(margin="xl"),
         FlexText(text="🌏 快速切換語言", size="sm", color=THEME_WHITE, weight="bold", margin="xl"),
-        _build_feature_button("🧠 自動偵測模式（非中文訊息 -> 中文）", "啟用自動偵測"),
+        _build_feature_button("🧠 自動偵測模式（非中文訊息 -> 中文）", "啟用自動偵測", mode_button_color),
         row_one,
         row_two,
         row_three,
@@ -133,6 +148,13 @@ def _build_quick_language_section(current_language_code: str) -> list[FlexBox | 
 
 
 def build_main_menu_card(source_type: str, is_group_manager: bool, current_language_code: str = "zh-TW") -> FlexMessage:
+    is_group_mode = source_type == "group"  # 判斷目前模式
+    mode_name = "群組翻譯模式" if is_group_mode else "個人模式"  # 模式名稱
+    mode_banner_color = THEME_GROUP if is_group_mode else THEME_PERSONAL_LIGHT  # 模式色系
+    mode_button_color = THEME_GROUP if is_group_mode else THEME_PERSONAL  # 模式按鈕主色
+    translation_enabled = True  # 目前翻譯功能預設啟用
+    auto_detect_enabled = current_language_code == "zh-TW"  # 中文為目標時視為自動偵測模式
+
     group_tip = "群組中可複選語言，之後每句都會固定翻譯。"  # 群組功能描述
     group_action = "查看群組設定"  # 群組按鈕預設動作
     group_label = "👥【群組翻譯】群組語言管理"  # 群組按鈕預設文字
@@ -146,31 +168,28 @@ def build_main_menu_card(source_type: str, is_group_manager: bool, current_langu
         group_action = "綁定邀請者"  # 直接提供綁定入口
         group_label = "👥【群組翻譯】綁定邀請者"  # 權限不足按鈕
 
-    main_actions = [
-        _build_feature_button("📘【教學中心】快速上手與完整教學", "指令說明"),
-        _build_feature_button(group_label, group_action),
-        _build_feature_button("⭐【VIP 功能】DeepL Pro｜高階翻譯能力", "指令說明"),
-    ]
-    main_actions.extend(_build_quick_language_section(current_language_code))
+    main_actions: list[FlexBox | FlexText | FlexSeparator | FlexButton] = []
+    main_actions.extend(_build_quick_language_section(current_language_code, mode_button_color))
 
     bubble = FlexBubble(
         size="giga",
         header=FlexBox(
             layout="vertical",
             paddingAll="18px",
-            backgroundColor=THEME_BG_DARK,
+            backgroundColor=mode_banner_color,
             contents=[
-                FlexText(text=BRAND_NAME, size="sm", color=THEME_GOLD, weight="bold"),
-                FlexText(text="翻譯控制中心", size="xxl", weight="bold", color=THEME_WHITE, margin="sm"),
-                FlexText(text="AI 即時翻譯系統已啟用", size="sm", color=THEME_MUTED, margin="md"),
-                FlexText(text="請選擇功能", size="sm", color=THEME_MUTED, margin="xs"),
+                FlexText(text="翻翻君 - V1.0正式版", size="sm", color=THEME_GOLD, weight="bold"),
+                FlexText(text="選單控制中心", size="xxl", weight="bold", color=THEME_WHITE, margin="sm"),
+                _build_status_text("即時翻譯功能", translation_enabled),
+                _build_status_text("自動偵測文字", auto_detect_enabled),
+                FlexText(text="當前版本 - V1.0.0 免費版", size="xs", color=THEME_WHITE, margin="md"),
             ],
         ),
         body=FlexBox(
             layout="vertical",
             spacing="sm",
             paddingAll="16px",
-            backgroundColor=THEME_BG_DEEP,
+            backgroundColor=mode_button_color,
             contents=main_actions,
         ),
         footer=FlexBox(
@@ -178,10 +197,16 @@ def build_main_menu_card(source_type: str, is_group_manager: bool, current_langu
             paddingAll="12px",
             backgroundColor=THEME_BG_DARK,
             contents=[
-                FlexText(text="🚀 群組模式已支援", size="sm", color=THEME_GOLD, weight="bold"),
-                FlexText(text="將 FanFan 加入 LINE 群組後：", size="xs", color=THEME_MUTED, margin="sm"),
-                FlexText(text="可啟用：即時多人翻譯 / 群組語言同步 / 自動辨識 / VIP 群功能", size="xs", color=THEME_MUTED, wrap=True, margin="xs"),
-                FlexText(text=group_tip, size="xs", color=THEME_MUTED, wrap=True, margin="md"),
+                FlexText(text=f"當前使用模式 - {mode_name}", size="sm", color=THEME_GOLD, weight="bold"),
+                FlexText(text=group_tip, size="xs", color=THEME_MUTED, wrap=True, margin="sm"),
+                FlexText(text="使用教學:", size="xs", color=THEME_WHITE, weight="bold", margin="md"),
+                FlexText(text="1. 先用上方語言按鈕設定可翻譯語言", size="xs", color=THEME_MUTED, wrap=True, margin="xs"),
+                FlexText(text="2. 點擊自動偵測可啟用非中文 -> 中文翻譯", size="xs", color=THEME_MUTED, wrap=True, margin="xs"),
+                FlexText(text="3. 群組模式可複選語言並自動互譯", size="xs", color=THEME_MUTED, wrap=True, margin="xs"),
+                FlexText(text="4. 輸入 /menu 或 /選單 可隨時重開控制中心", size="xs", color=THEME_MUTED, wrap=True, margin="xs"),
+                _build_feature_button("📘【教學中心】快速上手與完整教學", "指令說明", mode_button_color),
+                _build_feature_button(group_label, group_action, mode_button_color),
+                _build_feature_button("⭐【VIP 功能】DeepL Pro｜高階翻譯能力", "指令說明", mode_button_color),
             ],
         ),
     )  # 建立主選單卡片
