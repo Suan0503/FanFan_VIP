@@ -11,7 +11,7 @@ from linebot.v3.messaging import (
 from linebot.v3.webhooks import FollowEvent, JoinEvent, MessageEvent, TextMessageContent  # 匯入事件型別
 
 from app.core.config import settings  # 匯入設定
-from app.core.languages import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE_CODE, DEFAULT_LANGUAGE_LABEL  # 匯入語言設定
+from app.core.languages import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE_CODE  # 匯入語言設定
 from app.db.session import SessionLocal  # 匯入資料庫 Session
 from app.repositories.user_repository import get_user_by_line_id, create_user, update_user_language  # 匯入使用者存取
 from app.repositories.group_repository import (
@@ -46,6 +46,33 @@ line_handler = WebhookHandler(settings.line_channel_secret)  # 建立 webhook ha
 
 即時翻譯狀態: dict[str, bool] = {}  # 依使用情境保存即時翻譯開關
 自動偵測狀態: dict[str, bool] = {}  # 依使用情境保存自動偵測開關
+使用者智慧配置: dict[str, dict[str, str | bool]] = {}  # 使用者地區與語言自動配置
+
+
+語言模式顯示 = {
+    "zh-TW": "TW 中文",
+    "en": "US 英文",
+    "th": "TH 泰文",
+    "ja": "JP 日文",
+    "vi": "VN 越南文",
+    "ko": "KR 韓文",
+    "id": "ID 印尼文",
+    "my": "MM 緬甸文",
+    "ru": "RU 俄文",
+}  # 語言模式顯示文字
+
+
+語言區域配置 = {
+    "zh-TW": ("台灣 Taiwan", "Asia｜Taiwan"),
+    "en": ("美國 USA", "Global｜US"),
+    "th": ("泰國 Thailand", "Asia｜Thailand"),
+    "ja": ("日本 Japan", "Asia｜Japan"),
+    "vi": ("越南 Vietnam", "Asia｜Vietnam"),
+    "ko": ("韓國 Korea", "Asia｜Korea"),
+    "id": ("印尼 Indonesia", "Asia｜Indonesia"),
+    "my": ("緬甸 Myanmar", "Asia｜Myanmar"),
+    "ru": ("俄羅斯 Russia", "Europe｜Russia"),
+}  # 語言對應地區與節點
 
 
 def _狀態鍵(source_type: str, user_id: str | None, group_id: str | None) -> str:
@@ -58,6 +85,81 @@ def _目前開關狀態(state_key: str, default_auto_detect: bool) -> tuple[bool
     translation_enabled = 即時翻譯狀態.get(state_key, True)  # 預設開啟即時翻譯
     auto_detect_enabled = 自動偵測狀態.get(state_key, default_auto_detect)  # 預設依語言狀態決定
     return translation_enabled, auto_detect_enabled
+
+
+def _提取_line_language(event: FollowEvent) -> str | None:
+    language = getattr(event, "language", None) or getattr(getattr(event, "source", None), "language", None)  # 取可能欄位
+    if not isinstance(language, str):
+        return None
+    value = language.strip().lower()
+    return value if value else None
+
+
+def _line_language_對應語言代碼(line_language: str) -> str:
+    normalized = line_language.lower()
+    if normalized.startswith("zh"):
+        return "zh-TW"
+    if normalized.startswith("en"):
+        return "en"
+    if normalized.startswith("th"):
+        return "th"
+    if normalized.startswith("ja"):
+        return "ja"
+    if normalized.startswith("vi"):
+        return "vi"
+    if normalized.startswith("ko"):
+        return "ko"
+    if normalized.startswith("id"):
+        return "id"
+    if normalized.startswith("my"):
+        return "my"
+    if normalized.startswith("ru"):
+        return "ru"
+    return "en"  # 無法解析時預設英文
+
+
+def _文字偵測語言代碼(text: str) -> str:
+    candidate_codes = list(語言區域配置.keys())  # 目前支援語言
+    detected = detect_source_language(text, candidate_codes)
+    return detected if detected else "en"  # 偵測不到時預設英文
+
+
+def _設定使用者智慧配置(user_id: str, language_code: str, configured: bool) -> dict[str, str | bool]:
+    region_name, service_node = 語言區域配置.get(language_code, 語言區域配置["en"])
+    profile = {
+        "configured": configured,
+        "language_code": language_code,
+        "region_name": region_name,
+        "service_node": service_node,
+    }
+    使用者智慧配置[user_id] = profile  # 寫入地區配置
+    return profile
+
+
+def _取得使用者智慧配置(user_id: str) -> dict[str, str | bool] | None:
+    return 使用者智慧配置.get(user_id)
+
+
+def _建立智慧配置歡迎訊息(member_code: str, profile: dict[str, str | bool]) -> str:
+    language_code = str(profile.get("language_code", "en"))
+    language_mode = 語言模式顯示.get(language_code, "US 英文")
+    region_name = str(profile.get("region_name", "美國 USA"))
+    service_node = str(profile.get("service_node", "Global｜US"))
+    return (
+        "🌏 FanFan VIP｜翻翻君 V1.0\n"
+        "智慧翻譯系統已啟動\n"
+        "━━━━━━━━━━━━━━\n\n"
+        "🆔 帳號編號\n"
+        f"{member_code}\n\n"
+        "🟢 系統狀態\n"
+        "正常運作中\n\n"
+        "🌏 智慧地區配置\n"
+        f"已自動偵測：{region_name}\n\n"
+        "⚙ 自動配置完成\n"
+        f"語言模式：{language_mode}\n"
+        f"服務節點：{service_node}\n"
+        "━━━━━━━━━━━━━━"
+    )  # 回傳新版歡迎訊息
 
 
 def _語言代碼轉名稱(language_code: str) -> str:
@@ -147,25 +249,24 @@ def handle_follow(event: FollowEvent) -> None:
         if not user:
             member_code = generate_member_code(db)  # 產生綁定編號
             user = create_user(db, user_id, member_code, DEFAULT_LANGUAGE_CODE)  # 建立使用者資料
+        line_language = _提取_line_language(event)  # 取得 LINE language
+        if line_language:
+            language_code = _line_language_對應語言代碼(line_language)  # 有值時直接配置
+            update_user_language(db, user, language_code)  # 寫入語言模式
+            profile = _設定使用者智慧配置(user_id, language_code, True)  # 寫入地區配置
+            message = _建立智慧配置歡迎訊息(user.member_code, profile)
+            _reply_messages(
+                reply_token,
+                [
+                    TextMessage(text=message, quickReply=None, quoteToken=None),
+                    build_main_menu_card(source_type="user", is_group_manager=False, current_language_code=language_code),
+                ],
+            )  # 有 LINE language 時直接發歡迎訊息
+            return
 
-    message = (
-        "歡迎加入翻翻君 VIP！\n"
-        f"你的會員編號：{user.member_code}\n"
-        f"預設翻譯語言：{DEFAULT_LANGUAGE_LABEL}\n"
-        "預設翻譯通道：DeepL\n\n"
-        "快速上手：\n"
-        "1. 直接傳訊息，我會即時翻譯\n"
-        "2. 輸入 /選單 或 /menu 開啟功能選單\n"
-        "3. 輸入 語言設定 可切換常用語言\n"
-        "4. 輸入 指令說明 查看完整教學"
-    )  # 組合歡迎與教學訊息
-    _reply_messages(
-        reply_token,
-        [
-            TextMessage(text=message, quickReply=None, quoteToken=None),
-            build_main_menu_card(source_type="user", is_group_manager=False, current_language_code=DEFAULT_LANGUAGE_CODE),
-        ],
-    )  # 回覆歡迎訊息與主選單小卡
+        _設定使用者智慧配置(user_id, "en", False)  # 先建立待配置狀態
+
+    _reply_text(reply_token, "⚙ 正在等待智慧地區配置\n請先傳送第一句訊息，我會自動偵測地區與語言後完成啟動。")  # 無 language 時先等待第一句
 
 
 @line_handler.add(JoinEvent)
@@ -212,6 +313,22 @@ def handle_text_message(event: MessageEvent) -> None:
         if user_id and not user:
             member_code = generate_member_code(db)  # 產生新編號
             user = create_user(db, user_id, member_code, DEFAULT_LANGUAGE_CODE)  # 自動補建使用者
+
+        if source_type == "user" and user_id and user:
+            profile = _取得使用者智慧配置(user_id)
+            if profile and not bool(profile.get("configured", False)):
+                detected_code = _文字偵測語言代碼(text)  # 等第一句 AI 偵測
+                update_user_language(db, user, detected_code)  # 寫入語言模式
+                configured_profile = _設定使用者智慧配置(user_id, detected_code, True)  # 寫入地區
+                message = _建立智慧配置歡迎訊息(user.member_code, configured_profile)
+                _reply_messages(
+                    reply_token,
+                    [
+                        TextMessage(text=message, quickReply=None, quoteToken=None),
+                        build_main_menu_card(source_type="user", is_group_manager=False, current_language_code=detected_code),
+                    ],
+                )  # 產生歡迎訊息
+                return
 
         current_group = get_group(db, group_id) if group_id else None  # 先讀取群組資料供說明與權限判斷使用
         is_group_manager = bool(current_group and can_manage_group(current_group, user, user_id))  # 是否具備群組管理權限
