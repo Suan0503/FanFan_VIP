@@ -266,7 +266,13 @@ def handle_follow(event: FollowEvent) -> None:
 
         _設定使用者智慧配置(user_id, "en", False)  # 先建立待配置狀態
 
-    _reply_text(reply_token, "⚙ 正在等待智慧地區配置\n請先傳送第一句訊息，我會自動偵測地區與語言後完成啟動。")  # 無 language 時先等待第一句
+    _reply_text(
+        reply_token,
+        "⚙ 正在等待智慧地區配置\n"
+        "請先傳送第一句訊息，我會自動偵測地區與語言後完成啟動。\n\n"
+        "⚙ Smart region setup is pending.\n"
+        "Please send your first message, and I will auto-detect your region and language to complete activation.",
+    )  # 無 language 時先等待第一句（中英雙語）
 
 
 @line_handler.add(JoinEvent)
