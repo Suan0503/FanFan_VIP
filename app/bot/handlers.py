@@ -24,11 +24,10 @@ from app.repositories.group_repository import (
 from app.services.id_service import generate_member_code  # 匯入編號服務
 from app.services.translation_service import translate_text  # 匯入翻譯服務
 from app.services.permission_service import can_manage_group  # 匯入權限服務
-from app.ui.menu_cards import build_main_menu_card  # 匯入主選單小卡
+from app.ui.menu_cards import build_main_menu_card, build_language_setting_card  # 匯入新版 Flex 小卡
 from app.fanfan_core.language_profile import resolve_language_code, parse_language_labels  # 匯入舊版語言解析核心
 from app.fanfan_core.group_service import ensure_group_exists, toggle_or_set_languages, reset_languages  # 匯入舊版群組設定核心
 from app.fanfan_core.formatting import format_language_updated, format_translation_results  # 匯入舊版輸出格式核心
-from app.fanfan_core.menu_builder import build_legacy_language_setting_card  # 匯入舊版語言設定卡
 
 
 configuration = Configuration(access_token=settings.line_channel_access_token)  # 建立 LINE API 設定
@@ -145,7 +144,7 @@ def handle_follow(event: FollowEvent) -> None:
         reply_token,
         [
             TextMessage(text=message, quickReply=None, quoteToken=None),
-            build_main_menu_card(source_type="user", is_group_manager=False),
+            build_main_menu_card(source_type="user", is_group_manager=False, current_language_code=DEFAULT_LANGUAGE_CODE),
         ],
     )  # 回覆歡迎訊息與主選單小卡
 
@@ -172,7 +171,7 @@ def handle_join(event: JoinEvent) -> None:
                 quickReply=None,
                 quoteToken=None,
             ),
-            build_main_menu_card(source_type="group", is_group_manager=False),
+            build_main_menu_card(source_type="group", is_group_manager=False, current_language_code=DEFAULT_LANGUAGE_CODE),
         ],
     )  # 回覆群組初始化提示與主選單小卡
 
@@ -204,22 +203,28 @@ def handle_text_message(event: MessageEvent) -> None:
                 reply_token,
                 [
                     TextMessage(text="請使用下方小卡設定翻譯語言。", quickReply=None, quoteToken=None),
-                    build_legacy_language_setting_card(selected_codes, source_type, is_group_manager),
+                    build_language_setting_card(selected_codes, source_type, is_group_manager),
                 ],
             )  # 顯示語言設定小卡
             return
 
         if text_for_command in 主選單指令:
+            selected_codes = get_group_languages(db, group_id) if group_id else [user.target_language] if user else [DEFAULT_LANGUAGE_CODE]
             _reply_messages(
                 reply_token,
                 [
                     TextMessage(text="這是翻翻君主選單，請直接點擊小卡按鈕操作。", quickReply=None, quoteToken=None),
-                    build_main_menu_card(source_type=source_type, is_group_manager=is_group_manager),
+                    build_main_menu_card(
+                        source_type=source_type,
+                        is_group_manager=is_group_manager,
+                        current_language_code=selected_codes[0] if selected_codes else DEFAULT_LANGUAGE_CODE,
+                    ),
                 ],
             )  # 顯示主選單小卡
             return
 
         if text_for_command in 說明指令:
+            selected_codes = get_group_languages(db, group_id) if group_id else [user.target_language] if user else [DEFAULT_LANGUAGE_CODE]
             _reply_messages(
                 reply_token,
                 [
@@ -228,7 +233,11 @@ def handle_text_message(event: MessageEvent) -> None:
                         quickReply=None,
                         quoteToken=None,
                     ),
-                    build_main_menu_card(source_type=source_type, is_group_manager=is_group_manager),
+                    build_main_menu_card(
+                        source_type=source_type,
+                        is_group_manager=is_group_manager,
+                        current_language_code=selected_codes[0] if selected_codes else DEFAULT_LANGUAGE_CODE,
+                    ),
                 ],
             )  # 顯示指令說明與主選單小卡
             return
@@ -267,7 +276,7 @@ def handle_text_message(event: MessageEvent) -> None:
                     reply_token,
                     [
                         TextMessage(text=format_language_updated(updated_codes), quickReply=None, quoteToken=None),
-                        build_legacy_language_setting_card(updated_codes, source_type, True),
+                        build_language_setting_card(updated_codes, source_type, True),
                     ],
                 )  # 顯示更新後小卡
                 return
@@ -278,7 +287,7 @@ def handle_text_message(event: MessageEvent) -> None:
                 reply_token,
                 [
                     TextMessage(text=format_language_updated([selected_codes[0]]), quickReply=None, quoteToken=None),
-                    build_legacy_language_setting_card([selected_codes[0]], source_type, True),
+                    build_language_setting_card([selected_codes[0]], source_type, True),
                 ],
             )  # 個人模式更新語言與顯示小卡
             return
@@ -294,7 +303,7 @@ def handle_text_message(event: MessageEvent) -> None:
                     reply_token,
                     [
                         TextMessage(text=format_language_updated(updated_codes), quickReply=None, quoteToken=None),
-                        build_legacy_language_setting_card(updated_codes, source_type, True),
+                        build_language_setting_card(updated_codes, source_type, True),
                     ],
                 )  # 回覆重設成功並顯示小卡
                 return
@@ -305,7 +314,7 @@ def handle_text_message(event: MessageEvent) -> None:
                 reply_token,
                 [
                     TextMessage(text=format_language_updated([DEFAULT_LANGUAGE_CODE]), quickReply=None, quoteToken=None),
-                    build_legacy_language_setting_card([DEFAULT_LANGUAGE_CODE], source_type, True),
+                    build_language_setting_card([DEFAULT_LANGUAGE_CODE], source_type, True),
                 ],
             )  # 個人模式重設成功並顯示小卡
             return
