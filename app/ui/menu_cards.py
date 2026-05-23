@@ -315,6 +315,18 @@ QUICK_LANGUAGE_ITEMS = [
     ("ru", "RU俄文", "設定語言 俄文"),
 ]  # 主選單快速語言排序
 
+AUTO_DETECT_TARGET_NAMES = {
+    "zh-TW": "中文",
+    "en": "English",
+    "ja": "日本語",
+    "th": "ไทย",
+    "vi": "Tiếng Việt",
+    "ko": "한국어",
+    "id": "Bahasa Indonesia",
+    "my": "မြန်မာ",
+    "ru": "Русский",
+}
+
 
 def _language_label_by_code(language_code: str) -> str:
     for code, display_label, _ in QUICK_LANGUAGE_ITEMS:
@@ -326,6 +338,52 @@ def _language_label_by_code(language_code: str) -> str:
             return language_name  # 回退一般語言名稱
 
     return "未設定"  # 防禦性回傳
+
+
+def _auto_detect_target_label(language_code: str) -> str:
+    return AUTO_DETECT_TARGET_NAMES.get(language_code, _language_label_by_code(language_code))  # 使用語言原生名稱
+
+
+def _build_auto_detect_copy(language_code: str, enabled: bool) -> tuple[str, str]:
+    target_label = _auto_detect_target_label(language_code)
+    status_prefix = "開啟中" if enabled else "關閉中"
+    button_text = f"🧠 {status_prefix} 自動偵測模式（非{target_label}訊息 -> {target_label}）"
+    tutorial_text = f"2. 點擊自動偵測可啟用非{target_label} -> {target_label}翻譯"
+
+    if language_code == "en":
+        button_status = "ON" if enabled else "OFF"
+        button_text = f"🧠 {button_status} Auto Detect Mode (Non-{target_label} -> {target_label})"
+        tutorial_text = f"2. Enable auto detect for Non-{target_label} -> {target_label}"
+    elif language_code == "ja":
+        button_status = "有効" if enabled else "無効"
+        button_text = f"🧠 {button_status} 自動検出モード（非{target_label} -> {target_label}）"
+        tutorial_text = f"2. 自動検出で非{target_label}を{target_label}へ翻訳"
+    elif language_code == "th":
+        button_status = "เปิด" if enabled else "ปิด"
+        button_text = f"🧠 {button_status} โหมดตรวจจับอัตโนมัติ ({target_label} อื่น -> {target_label})"
+        tutorial_text = f"2. เปิดโหมดตรวจจับอัตโนมัติสำหรับภาษาที่ไม่ใช่ {target_label} -> {target_label}"
+    elif language_code == "vi":
+        button_status = "Bật" if enabled else "Tắt"
+        button_text = f"🧠 {button_status} chế độ tự nhận diện (không phải {target_label} -> {target_label})"
+        tutorial_text = f"2. Bật tự nhận diện cho ngôn ngữ không phải {target_label} -> {target_label}"
+    elif language_code == "ko":
+        button_status = "켜짐" if enabled else "꺼짐"
+        button_text = f"🧠 {button_status} 자동 감지 모드 (비{target_label} -> {target_label})"
+        tutorial_text = f"2. 자동 감지로 비{target_label} -> {target_label} 번역"
+    elif language_code == "id":
+        button_status = "Aktif" if enabled else "Nonaktif"
+        button_text = f"🧠 {button_status} Mode Deteksi Otomatis (Non-{target_label} -> {target_label})"
+        tutorial_text = f"2. Aktifkan auto detect untuk Non-{target_label} -> {target_label}"
+    elif language_code == "my":
+        button_status = "ဖွင့်ထားသည်" if enabled else "ပိတ်ထားသည်"
+        button_text = f"🧠 {button_status} အလိုအလျောက်ရှာဖွေမှု ({target_label} မဟုတ် -> {target_label})"
+        tutorial_text = f"2. Auto detect ဖြင့် {target_label} မဟုတ် -> {target_label} ပြောင်းပါ"
+    elif language_code == "ru":
+        button_status = "ВКЛ" if enabled else "ВЫКЛ"
+        button_text = f"🧠 {button_status} Автоопределение (не {target_label} -> {target_label})"
+        tutorial_text = f"2. Включите автоопределение для не-{target_label} -> {target_label}"
+
+    return button_text, tutorial_text
 
 
 def _build_feature_button(label: str, command_text: str, button_color: str) -> FlexButton:
@@ -416,6 +474,7 @@ def _build_quick_language_section(
     auto_detect_enabled: bool,
     i18n: dict[str, str],
 ) -> list[FlexBox | FlexText | FlexSeparator | FlexButton]:
+    auto_detect_text, _ = _build_auto_detect_copy(current_language_code, auto_detect_enabled)
     row_top = FlexBox(
         layout="horizontal",
         spacing="sm",
@@ -515,7 +574,7 @@ def _build_quick_language_section(
             margin="xl",
         ),
         _build_feature_button(
-            i18n["auto_detect_on"] if auto_detect_enabled else i18n["auto_detect_off"],
+            auto_detect_text,
             "關閉自動偵測" if auto_detect_enabled else "啟用自動偵測",
             mode_button_color,
         ),
@@ -536,6 +595,7 @@ def build_main_menu_card(
 ) -> FlexMessage:
     is_group_mode = source_type == "group"  # 判斷是否群組模式
     i18n = MENU_I18N.get(current_language_code, MENU_I18N["zh-TW"])  # 依當前語言切換選單文案
+    _, tutorial_auto_detect = _build_auto_detect_copy(current_language_code, auto_detect_enabled)
     mode_name = i18n["mode_group"] if is_group_mode else i18n["mode_personal"]  # 模式名稱
     mode_banner_color = THEME_GROUP if is_group_mode else THEME_PERSONAL_LIGHT  # 標題色
     mode_button_color = THEME_GROUP if is_group_mode else THEME_PERSONAL  # 內容色
@@ -651,7 +711,7 @@ def build_main_menu_card(
                     margin="xs",
                 ),
                 FlexText(
-                    text=i18n["tutorial_2"],
+                    text=tutorial_auto_detect,
                     size="xs",
                     color=THEME_MUTED,
                     wrap=True,

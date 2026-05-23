@@ -21,6 +21,10 @@ def _looks_like_myanmar(text: str) -> bool:
     return any("\u1000" <= ch <= "\u109f" for ch in text)  # 緬文範圍
 
 
+def _looks_like_russian(text: str) -> bool:
+    return any(("\u0400" <= ch <= "\u04ff") or ch in "Ёё" for ch in text)  # 西里爾字母範圍
+
+
 def _looks_like_vietnamese(text: str) -> bool:
     markers = "ăâđêôơưÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬáàảãạắằẳẵặấầẩẫậÉÈẺẼẸÊẾỀỂỄỆéèẻẽẹếềểễệÍÌỈĨỊíìỉĩịÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢóòỏõọốồổỗộớờởỡợÚÙỦŨỤƯỨỪỬỮỰúùủũụứừửữựÝỲỶỸỴýỳỷỹỵ"
     return any(ch in markers for ch in text)  # 越文常用重音字元
@@ -36,6 +40,7 @@ def detect_source_language(text: str, candidate_codes: list[str]) -> str | None:
         ("ja", _looks_like_japanese(clean)),
         ("ko", _looks_like_korean(clean)),
         ("my", _looks_like_myanmar(clean)),
+        ("ru", _looks_like_russian(clean)),
         ("vi", _looks_like_vietnamese(clean)),
         ("zh-TW", _looks_like_chinese(clean)),
     ]

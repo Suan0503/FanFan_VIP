@@ -176,6 +176,15 @@ def _群組語言摘要(language_codes: list[str]) -> str:
     return "、".join(labels)  # 組合摘要文字
 
 
+def _自動偵測目標語言(source_type: str, user, group_id: str | None, db) -> str:
+    if source_type == "group" and group_id:
+        group_codes = get_group_languages(db, group_id)
+        return group_codes[0] if group_codes else DEFAULT_LANGUAGE_CODE  # 群組沿用第一個主語言
+    if user and getattr(user, "target_language", None):
+        return user.target_language  # 個人模式沿用目前選單語言
+    return DEFAULT_LANGUAGE_CODE  # 無資料時回退預設語言
+
+
 def _標準化指令文字(text: str) -> str:
     normalized = text.strip()  # 清理首尾空白
     while normalized.startswith(("/", "／")):
@@ -355,7 +364,7 @@ def handle_text_message(event: MessageEvent) -> None:
             state_key = _狀態鍵(source_type, user_id, group_id)
             translation_enabled, auto_detect_enabled = _目前開關狀態(
                 state_key,
-                default_auto_detect=(source_type != "group" and (selected_codes[0] if selected_codes else DEFAULT_LANGUAGE_CODE) == DEFAULT_LANGUAGE_CODE),
+                default_auto_detect=(source_type != "group"),
             )
             _reply_messages(
                 reply_token,
@@ -377,7 +386,7 @@ def handle_text_message(event: MessageEvent) -> None:
             state_key = _狀態鍵(source_type, user_id, group_id)
             translation_enabled, auto_detect_enabled = _目前開關狀態(
                 state_key,
-                default_auto_detect=(source_type != "group" and (selected_codes[0] if selected_codes else DEFAULT_LANGUAGE_CODE) == DEFAULT_LANGUAGE_CODE),
+                default_auto_detect=(source_type != "group"),
             )
             _reply_messages(
                 reply_token,
@@ -411,12 +420,12 @@ def handle_text_message(event: MessageEvent) -> None:
             return
 
         if text_for_command in 自動偵測啟用指令:
-            if user:
-                update_user_language(db, user, DEFAULT_LANGUAGE_CODE)  # 自動偵測模式預設翻成中文
+            target_code = _自動偵測目標語言(source_type, user, group_id, db)
+            target_label = _語言代碼轉名稱(target_code)
             自動偵測狀態[state_key] = True
             _reply_text(
                 reply_token,
-                "✅ 已啟用自動偵測模式\n現在會優先偵測語言，遇到非中文訊息會翻譯成中文。",
+                f"✅ 已啟用自動偵測模式\n現在會優先偵測語言，遇到非{target_label}訊息時會翻譯成{target_label}。",
             )
             return
 
@@ -540,7 +549,7 @@ def handle_text_message(event: MessageEvent) -> None:
 
         translation_enabled, auto_detect_enabled = _目前開關狀態(
             state_key,
-            default_auto_detect=(source_type != "group" and (user.target_language if user else DEFAULT_LANGUAGE_CODE) == DEFAULT_LANGUAGE_CODE),
+            default_auto_detect=(source_type != "group"),
         )
 
         if not translation_enabled:
@@ -557,9 +566,9 @@ def handle_text_message(event: MessageEvent) -> None:
         elif user:
             target_code = user.target_language  # 採用個人語言
 
-        if auto_detect_enabled and target_code == DEFAULT_LANGUAGE_CODE:
-            source_code = detect_source_language(text, [DEFAULT_LANGUAGE_CODE])  # 判斷是否已是中文
-            if source_code == DEFAULT_LANGUAGE_CODE:
+        if auto_detect_enabled:
+            source_code = detect_source_language(text, [target_code])  # 判斷是否已是目標語言
+            if source_code == target_code:
                 _reply_text(reply_token, f"翻譯結果：\n{text}")  # 中文原文直接回傳
                 return
 
