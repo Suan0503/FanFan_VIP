@@ -1,4 +1,4 @@
-from linebot.v3.messaging import (
+from linebot.v3.messaging import (  # 匯入 Flex 訊息元件
     FlexBox,
     FlexBubble,
     FlexButton,
@@ -9,20 +9,20 @@ from linebot.v3.messaging import (
     MessageAction,
 )
 
-from app.core.languages import SUPPORTED_LANGUAGES
+from app.core.languages import SUPPORTED_LANGUAGES  # 匯入語言設定
 
 
-BRAND_NAME = "FanFan VIP"
-THEME_BG_DARK = "#0B1220"
-THEME_BG_DEEP = "#14213D"
-THEME_GOLD = "#D4AF37"
-THEME_MUTED = "#94A3B8"
-THEME_WHITE = "#F8FAFC"
-THEME_SUCCESS = "#22C55E"
-THEME_DANGER = "#64748B"
-THEME_PERSONAL = "#1E3A8A"
-THEME_PERSONAL_LIGHT = "#1D4ED8"
-THEME_GROUP = "#14213D"
+BRAND_NAME = "FanFan VIP"  # 品牌名稱
+THEME_BG_DARK = "#0B1220"  # 主底色
+THEME_BG_DEEP = "#14213D"  # 深藍背景
+THEME_GOLD = "#D4AF37"  # 強調金色
+THEME_MUTED = "#94A3B8"  # 輔助灰
+THEME_WHITE = "#F8FAFC"  # 亮色文字
+THEME_SUCCESS = "#22C55E"  # 啟用狀態色
+THEME_DANGER = "#64748B"  # 關閉狀態色
+THEME_PERSONAL = "#1E3A8A"  # 個人模式主色
+THEME_PERSONAL_LIGHT = "#1D4ED8"  # 個人模式標題色
+THEME_GROUP = "#14213D"  # 群組模式主色
 
 
 LANGUAGE_MENU_ITEMS = [
@@ -35,7 +35,7 @@ LANGUAGE_MENU_ITEMS = [
     ("KR", "韓文", "韓文", "ko"),
     ("ID", "印尼文", "印尼文", "id"),
     ("RU", "俄文", "俄文", "ru"),
-]
+]  # 語言設定頁按鈕排序
 
 QUICK_LANGUAGE_ITEMS = [
     ("zh-TW", "TW中文", "設定語言 中文"),
@@ -47,19 +47,19 @@ QUICK_LANGUAGE_ITEMS = [
     ("id", "ID印尼文", "設定語言 印尼文"),
     ("my", "MM緬甸文", "設定語言 緬甸文"),
     ("ru", "RU俄文", "設定語言 俄文"),
-]
+]  # 主選單快速語言排序
 
 
 def _language_label_by_code(language_code: str) -> str:
     for code, display_label, _ in QUICK_LANGUAGE_ITEMS:
         if code == language_code:
-            return display_label
+            return display_label  # 命中快速語言顯示名稱
 
     for language_name, code in SUPPORTED_LANGUAGES.items():
         if code == language_code:
-            return language_name
+            return language_name  # 回退一般語言名稱
 
-    return "未設定"
+    return "未設定"  # 防禦性回傳
 
 
 def _build_feature_button(label: str, command_text: str, button_color: str) -> FlexButton:
@@ -70,7 +70,7 @@ def _build_feature_button(label: str, command_text: str, button_color: str) -> F
         cornerRadius="14px",
         height="sm",
         margin="md",
-    )
+    )  # 建立功能按鈕
 
 
 def _build_language_chip(
@@ -79,7 +79,7 @@ def _build_language_chip(
     command_text: str,
     current_language_code: str,
 ) -> FlexButton:
-    selected = language_code == current_language_code
+    selected = language_code == current_language_code  # 是否為目前語言
 
     return FlexButton(
         style="primary",
@@ -91,7 +91,7 @@ def _build_language_chip(
         cornerRadius="18px",
         margin="sm",
         height="sm",
-    )
+    )  # 建立快速語言按鈕
 
 
 def _build_status_toggle_row(
@@ -100,9 +100,9 @@ def _build_status_toggle_row(
     on_command: str,
     off_command: str,
 ) -> FlexBox:
-    toggle_label = "關閉" if enabled else "開啟"
-    toggle_command = off_command if enabled else on_command
-    toggle_color = "#334155" if enabled else THEME_SUCCESS
+    toggle_label = "關閉" if enabled else "開啟"  # 依狀態切換按鈕文字
+    toggle_command = off_command if enabled else on_command  # 依狀態切換命令
+    toggle_color = "#334155" if enabled else THEME_SUCCESS  # 關閉/開啟顏色
 
     return FlexBox(
         layout="horizontal",
@@ -126,11 +126,11 @@ def _build_status_toggle_row(
                     text=toggle_command,
                 ),
                 cornerRadius="12px",
-                height="xs",
+                height="sm",
                 flex=2,
             ),
         ],
-    )
+    )  # 建立狀態列與切換按鈕
 
 
 def _build_quick_language_section(
@@ -149,7 +149,7 @@ def _build_quick_language_section(
                 current_language_code,
             ),
         ],
-    )
+    )  # 第一排單顆語言
 
     row_one = FlexBox(
         layout="horizontal",
@@ -168,7 +168,7 @@ def _build_quick_language_section(
                 current_language_code,
             ),
         ],
-    )
+    )  # 第二排雙語言
 
     row_two = FlexBox(
         layout="horizontal",
@@ -187,7 +187,7 @@ def _build_quick_language_section(
                 current_language_code,
             ),
         ],
-    )
+    )  # 第三排雙語言
 
     row_three = FlexBox(
         layout="horizontal",
@@ -206,7 +206,7 @@ def _build_quick_language_section(
                 current_language_code,
             ),
         ],
-    )
+    )  # 第四排雙語言
 
     row_four = FlexBox(
         layout="horizontal",
@@ -225,7 +225,7 @@ def _build_quick_language_section(
                 current_language_code,
             ),
         ],
-    )
+    )  # 第五排雙語言
 
     return [
         FlexSeparator(margin="xl"),
@@ -246,7 +246,7 @@ def _build_quick_language_section(
         row_two,
         row_three,
         row_four,
-    ]
+    ]  # 回傳快速語言區
 
 
 def build_main_menu_card(
@@ -256,25 +256,25 @@ def build_main_menu_card(
     translation_enabled: bool = True,
     auto_detect_enabled: bool = False,
 ) -> FlexMessage:
-    is_group_mode = source_type == "group"
-    mode_name = "群組翻譯模式" if is_group_mode else "個人模式"
-    mode_banner_color = THEME_GROUP if is_group_mode else THEME_PERSONAL_LIGHT
-    mode_button_color = THEME_GROUP if is_group_mode else THEME_PERSONAL
+    is_group_mode = source_type == "group"  # 判斷是否群組模式
+    mode_name = "群組翻譯模式" if is_group_mode else "個人模式"  # 模式名稱
+    mode_banner_color = THEME_GROUP if is_group_mode else THEME_PERSONAL_LIGHT  # 標題色
+    mode_button_color = THEME_GROUP if is_group_mode else THEME_PERSONAL  # 內容色
 
-    group_tip = "群組中可複選語言，之後每句都會固定翻譯。"
-    group_action = "查看群組設定"
-    group_label = "👥【群組翻譯】群組語言管理"
+    group_tip = "群組中可複選語言，之後每句都會固定翻譯。"  # 群組提示
+    group_action = "查看群組設定"  # 群組功能預設命令
+    group_label = "👥【群組翻譯】群組語言管理"  # 群組功能按鈕文字
 
     if source_type != "group":
-        group_tip = "把翻翻君加入群組後，可開啟群組多語翻譯。"
-        group_action = "指令說明"
-        group_label = "👥【群組翻譯】群組功能說明"
+        group_tip = "把翻翻君加入群組後，可開啟群組多語翻譯。"  # 個人模式提示
+        group_action = "指令說明"  # 個人模式顯示說明
+        group_label = "👥【群組翻譯】群組功能說明"  # 個人模式按鈕
     elif not is_group_manager:
-        group_tip = "尚未取得群組設定權限，請先輸入：綁定邀請者"
-        group_action = "綁定邀請者"
-        group_label = "👥【群組翻譯】綁定邀請者"
+        group_tip = "尚未取得群組設定權限，請先輸入：綁定邀請者"  # 權限不足提示
+        group_action = "綁定邀請者"  # 權限不足導向命令
+        group_label = "👥【群組翻譯】綁定邀請者"  # 權限不足按鈕
 
-    main_actions: list[FlexBox | FlexText | FlexSeparator | FlexButton] = []
+    main_actions: list[FlexBox | FlexText | FlexSeparator | FlexButton] = []  # 主內容元件
     main_actions.extend(
         _build_quick_language_section(
             current_language_code,
@@ -400,13 +400,13 @@ def build_main_menu_card(
                 ),
             ],
         ),
-    )
+    )  # 建立主選單 Bubble
 
     return FlexMessage(
         altText="翻翻君主選單",
         contents=bubble,
         quickReply=None,
-    )
+    )  # 回傳主選單訊息
 
 
 def build_language_setting_card(
@@ -417,7 +417,7 @@ def build_language_setting_card(
     today_translated_chars: int = 0,
     translation_limit: int = 3000,
 ) -> FlexMessage:
-    title = "🌐 群組翻譯設定" if source_type == "group" else "🌐 個人翻譯設定"
+    title = "🌐 群組翻譯設定" if source_type == "group" else "🌐 個人翻譯設定"  # 標題
     subtitle = (
         "請加上 / 取消要翻譯成的語言，可複選。"
         if source_type == "group"
@@ -427,21 +427,21 @@ def build_language_setting_card(
     selected_labels = [
         name for name, code in SUPPORTED_LANGUAGES.items() if code in selected_codes
     ]
-    selected_text = "、".join(selected_labels) if selected_labels else "尚未設定"
-    current_code = selected_codes[0] if selected_codes else "zh-TW"
-    current_label = _language_label_by_code(current_code)
+    selected_text = "、".join(selected_labels) if selected_labels else "尚未設定"  # 已選語言摘要
+    current_code = selected_codes[0] if selected_codes else "zh-TW"  # 目前語言代碼
+    current_label = _language_label_by_code(current_code)  # 目前語言顯示名稱
 
     if source_type == "group" and not can_manage_group:
-        permission_hint = "你目前沒有設定權限（需邀請者代表 / 管理員 / 所有者）。"
+        permission_hint = "你目前沒有設定權限（需邀請者代表 / 管理員 / 所有者）。"  # 權限不足提示
     else:
-        permission_hint = "點擊下方語言按鈕即可切換勾選狀態。"
+        permission_hint = "點擊下方語言按鈕即可切換勾選狀態。"  # 操作提示
 
-    button_contents = []
+    button_contents = []  # 語言按鈕集合
 
     for tag, pretty_name, command_name, language_code in LANGUAGE_MENU_ITEMS:
-        is_selected = language_code in selected_codes
-        label_text = f"✅ {tag} {pretty_name}" if is_selected else f"{tag} {pretty_name}"
-        action_text = f"設定語言 {command_name}"
+        is_selected = language_code in selected_codes  # 是否已勾選
+        label_text = f"✅ {tag} {pretty_name}" if is_selected else f"{tag} {pretty_name}"  # 顯示文字
+        action_text = f"設定語言 {command_name}"  # 送出命令
 
         button_contents.append(
             FlexButton(
@@ -543,13 +543,13 @@ def build_language_setting_card(
                 ),
             ],
         ),
-    )
+    )  # 建立語言設定 Bubble
 
     return FlexMessage(
         altText="翻翻君語言設定",
         contents=bubble,
         quickReply=None,
-    )
+    )  # 回傳語言設定訊息
 
 
 def build_main_menu_json(
@@ -561,9 +561,9 @@ def build_main_menu_json(
         source_type,
         is_group_manager,
         current_language_code,
-    )
+    )  # 產生主選單
 
     if hasattr(menu_message, "to_dict"):
-        return menu_message.to_dict()
+        return menu_message.to_dict()  # 轉為完整 JSON
 
-    return {"altText": menu_message.alt_text, "contents": {}}
+    return {"altText": menu_message.alt_text, "contents": {}}  # 防禦性回傳
