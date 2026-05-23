@@ -23,6 +23,7 @@ THEME_DANGER = "#64748B"  # 關閉狀態色
 THEME_PERSONAL = "#1E3A8A"  # 個人模式主色
 THEME_PERSONAL_LIGHT = "#1D4ED8"  # 個人模式標題色
 THEME_GROUP = "#14213D"  # 群組模式主色
+LINE_ACTION_LABEL_MAX = 40  # LINE MessageAction label 長度上限
 
 
 MENU_I18N = {
@@ -331,11 +332,18 @@ def _build_feature_button(label: str, command_text: str, button_color: str) -> F
     return FlexButton(
         style="primary",
         color=button_color,
-        action=MessageAction(label=label, text=command_text),
+        action=MessageAction(label=_safe_action_label(label), text=command_text),
         cornerRadius="14px",
         height="sm",
         margin="md",
     )  # 建立功能按鈕
+
+
+def _safe_action_label(label: str) -> str:
+    value = (label or "").strip()  # 清理空白
+    if len(value) <= LINE_ACTION_LABEL_MAX:
+        return value  # 未超長直接回傳
+    return f"{value[: LINE_ACTION_LABEL_MAX - 3]}..."  # 超長裁切避免 LINE 400
 
 
 def _build_language_chip(
@@ -350,7 +358,7 @@ def _build_language_chip(
         style="primary",
         color=THEME_GOLD if selected else THEME_BG_DARK,
         action=MessageAction(
-            label=f"✅ {label}" if selected else label,
+            label=_safe_action_label(f"✅ {label}" if selected else label),
             text=command_text,
         ),
         cornerRadius="18px",
@@ -391,7 +399,7 @@ def _build_status_toggle_row(
                 style="primary",
                 color=toggle_color,
                 action=MessageAction(
-                    label=toggle_label,
+                    label=_safe_action_label(toggle_label),
                     text=toggle_command,
                 ),
                 cornerRadius="12px",
@@ -727,7 +735,7 @@ def build_language_setting_card(
             FlexButton(
                 style="primary",
                 color=THEME_GOLD if is_selected else THEME_BG_DEEP,
-                action=MessageAction(label=label_text, text=action_text),
+                action=MessageAction(label=_safe_action_label(label_text), text=action_text),
                 cornerRadius="14px",
                 height="sm",
                 margin="sm",
@@ -737,7 +745,7 @@ def build_language_setting_card(
     button_contents.append(
         FlexButton(
             style="secondary",
-            action=MessageAction(label="🔁 重設翻譯設定", text="重設翻譯設定"),
+            action=MessageAction(label=_safe_action_label("🔁 重設翻譯設定"), text="重設翻譯設定"),
             margin="md",
             height="sm",
         )
@@ -746,7 +754,7 @@ def build_language_setting_card(
     button_contents.append(
         FlexButton(
             style="secondary",
-            action=MessageAction(label="🏠 回主選單", text="/menu"),
+            action=MessageAction(label=_safe_action_label("🏠 回主選單"), text="/menu"),
             margin="md",
             height="sm",
         )
