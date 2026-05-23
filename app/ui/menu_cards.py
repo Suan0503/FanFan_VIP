@@ -29,17 +29,19 @@ LANGUAGE_MENU_ITEMS = [
     ("MM", "緬甸文", "緬甸文", "my"),
     ("KR", "韓文", "韓文", "ko"),
     ("ID", "印尼文", "印尼文", "id"),
+    ("RU", "俄文", "俄文", "ru"),
 ]  # 語言按鈕顯示設定
 
 QUICK_LANGUAGE_ITEMS = [
-    ("zh-TW", "🇹🇼 中文（繁體）", "設定語言 中文"),
-    ("en", "🇺🇸 English", "設定語言 英文"),
-    ("ja", "🇯🇵 日本語", "設定語言 日文"),
-    ("th", "🇹🇭 ไทย", "設定語言 泰文"),
-    ("vi", "🇻🇳 Tiếng Việt", "設定語言 越南文"),
-    ("ko", "🇰🇷 한국어", "設定語言 韓文"),
-    ("my", "🇲🇲 မြန်မာ", "設定語言 緬甸文"),
-    ("id", "🇮🇩 Bahasa Indonesia", "設定語言 印尼文"),
+    ("zh-TW", "TW 中文(繁體)", "設定語言 中文"),
+    ("en", "US 英文", "設定語言 英文"),
+    ("ja", "JP 日文", "設定語言 日文"),
+    ("th", "TH 泰文", "設定語言 泰文"),
+    ("vi", "VN 越南文", "設定語言 越南文"),
+    ("ko", "KR 韓文", "設定語言 韓文"),
+    ("my", "MM 緬甸文", "設定語言 緬甸文"),
+    ("id", "ID 印尼文", "設定語言 印尼文"),
+    ("ru", "RU 俄文", "設定語言 俄文"),
 ]  # 快速切換語言（雙欄）
 
 
@@ -76,7 +78,7 @@ def _build_language_chip(language_code: str, label: str, command_text: str, curr
     )  # 建立熱門語言雙欄卡片
 
 
-def _build_quick_language_section(current_language_code: str) -> list[FlexBox | FlexText | FlexSeparator]:
+def _build_quick_language_section(current_language_code: str) -> list[FlexBox | FlexText | FlexSeparator | FlexButton]:
     row_one = FlexBox(
         layout="horizontal",
         spacing="sm",
@@ -109,14 +111,24 @@ def _build_quick_language_section(current_language_code: str) -> list[FlexBox | 
             _build_language_chip(QUICK_LANGUAGE_ITEMS[7][0], QUICK_LANGUAGE_ITEMS[7][1], QUICK_LANGUAGE_ITEMS[7][2], current_language_code),
         ],
     )
+    row_five = FlexBox(
+        layout="horizontal",
+        spacing="sm",
+        contents=[
+            _build_language_chip(QUICK_LANGUAGE_ITEMS[8][0], QUICK_LANGUAGE_ITEMS[8][1], QUICK_LANGUAGE_ITEMS[8][2], current_language_code),
+            FlexFiller(),
+        ],
+    )
 
     return [
         FlexSeparator(margin="xl"),
         FlexText(text="🌏 快速切換語言", size="sm", color=THEME_WHITE, weight="bold", margin="xl"),
+        _build_feature_button("🧠 自動偵測模式（非中文訊息 -> 中文）", "啟用自動偵測"),
         row_one,
         row_two,
         row_three,
         row_four,
+        row_five,
     ]  # 建立語言雙欄區
 
 
@@ -135,7 +147,6 @@ def build_main_menu_card(source_type: str, is_group_manager: bool, current_langu
         group_label = "👥【群組翻譯】綁定邀請者"  # 權限不足按鈕
 
     main_actions = [
-        _build_feature_button("⚙【個人設定】語言設定｜翻譯偏好｜個人模式", "語言設定"),
         _build_feature_button("📘【教學中心】快速上手與完整教學", "指令說明"),
         _build_feature_button(group_label, group_action),
         _build_feature_button("⭐【VIP 功能】DeepL Pro｜高階翻譯能力", "指令說明"),

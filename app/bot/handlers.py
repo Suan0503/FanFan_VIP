@@ -27,7 +27,7 @@ from app.services.permission_service import can_manage_group  # 匯入權限服�
 from app.ui.menu_cards import build_main_menu_card, build_language_setting_card  # 匯入新版 Flex 小卡
 from app.fanfan_core.language_profile import resolve_language_code, parse_language_labels  # 匯入舊版語言解析核心
 from app.fanfan_core.group_service import ensure_group_exists, toggle_or_set_languages, reset_languages  # 匯入舊版群組設定核心
-from app.fanfan_core.formatting import format_language_updated, format_translation_results  # 匯入舊版輸出格式核心
+from app.fanfan_core.formatting import format_language_updated, format_translation_results, detect_source_language  # 匯入舊版輸出格式核心
 
 
 configuration = Configuration(access_token=settings.line_channel_access_token)  # 建立 LINE API 設定
@@ -39,6 +39,7 @@ line_handler = WebhookHandler(settings.line_channel_secret)  # 建立 webhook ha
 管理員白名單指令 = {"查看群組設定", "重設邀請者"}  # 僅管理者可用的群組指令
 說明指令 = {"指令說明", "使用說明", "幫助"}  # 顯示說明指令
 重設翻譯指令 = {"重設翻譯設定", "重設語言"}  # 重設群組翻譯語言
+自動偵測指令 = {"啟用自動偵測", "自動偵測"}  # 啟用非中文轉中文
 
 
 def _語言代碼轉名稱(language_code: str) -> str:
@@ -242,6 +243,15 @@ def handle_text_message(event: MessageEvent) -> None:
             )  # 顯示指令說明與主選單小卡
             return
 
+        if text_for_command in 自動偵測指令:
+            if user:
+                update_user_language(db, user, DEFAULT_LANGUAGE_CODE)  # 自動偵測模式預設翻成中文
+            _reply_text(
+                reply_token,
+                "✅ 已啟用自動偵測模式\n現在會優先偵測語言，遇到非中文訊息會翻譯成中文。",
+            )
+            return
+
         if text.startswith("設定語言 "):
             selected_labels = parse_language_labels(text.replace("設定語言 ", "", 1).strip())  # 解析語言名稱
             if not selected_labels:
@@ -364,6 +374,12 @@ def handle_text_message(event: MessageEvent) -> None:
             return
         elif user:
             target_code = user.target_language  # 採用個人語言
+
+        if target_code == DEFAULT_LANGUAGE_CODE:
+            source_code = detect_source_language(text, [DEFAULT_LANGUAGE_CODE])  # 判斷是否已是中文
+            if source_code == DEFAULT_LANGUAGE_CODE:
+                _reply_text(reply_token, f"翻譯結果：\n{text}")  # 中文原文直接回傳
+                return
 
         translated = translate_text(text, target_code)  # 執行翻譯
         _reply_text(reply_token, f"翻譯結果：\n{translated}")  # 回覆翻譯結果
