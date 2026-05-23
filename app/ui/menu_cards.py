@@ -38,15 +38,15 @@ LANGUAGE_MENU_ITEMS = [
 ]  # 語言按鈕顯示設定
 
 QUICK_LANGUAGE_ITEMS = [
-    ("zh-TW", "TW 中文(繁體)", "設定語言 中文"),
-    ("en", "US 英文", "設定語言 英文"),
-    ("th", "TH 泰文", "設定語言 泰文"),
-    ("ja", "JP 日文", "設定語言 日文"),
-    ("vi", "VN 越南文", "設定語言 越南文"),
-    ("ko", "KR 韓文", "設定語言 韓文"),
-    ("id", "ID 印尼文", "設定語言 印尼文"),
-    ("my", "MM 緬甸文", "設定語言 緬甸文"),
-    ("ru", "RU 俄文", "設定語言 俄文"),
+    ("zh-TW", "TW中文", "設定語言 中文"),
+    ("en", "US英文", "設定語言 英文"),
+    ("th", "TH泰文", "設定語言 泰文"),
+    ("ja", "JP日文", "設定語言 日文"),
+    ("vi", "VN越南文", "設定語言 越南文"),
+    ("ko", "KR韓文", "設定語言 韓文"),
+    ("id", "ID印尼文", "設定語言 印尼文"),
+    ("my", "MM緬甸文", "設定語言 緬甸文"),
+    ("ru", "RU俄文", "設定語言 俄文"),
 ]  # 快速切換語言（雙欄）
 
 
@@ -102,14 +102,24 @@ def _build_status_toggle_row(label: str, enabled: bool, on_command: str, off_com
         spacing="sm",
         margin="sm",
         contents=[
-            _build_status_text(label, enabled),
-            FlexButton(
-                style="primary",
-                color=toggle_color,
-                action=MessageAction(label=toggle_label, text=toggle_command),
-                cornerRadius="4px",
-                height="sm",
-                flex=1,
+            FlexBox(
+                layout="vertical",
+                flex=7,
+                contents=[_build_status_text(label, enabled)],
+            ),
+            FlexBox(
+                layout="vertical",
+                flex=3,
+                justifyContent="center",
+                contents=[
+                    FlexButton(
+                        style="primary",
+                        color=toggle_color,
+                        action=MessageAction(label=toggle_label, text=toggle_command),
+                        cornerRadius="8px",
+                        height="sm",
+                    )
+                ],
             ),
         ],
     )  # 建立狀態列與切換按鈕
@@ -120,44 +130,43 @@ def _build_quick_language_section(
     mode_button_color: str,
     auto_detect_enabled: bool,
 ) -> list[FlexBox | FlexText | FlexSeparator | FlexButton]:
-    row_one = FlexBox(
+    row_top = FlexBox(
         layout="horizontal",
         spacing="sm",
         contents=[
             _build_language_chip(QUICK_LANGUAGE_ITEMS[0][0], QUICK_LANGUAGE_ITEMS[0][1], QUICK_LANGUAGE_ITEMS[0][2], current_language_code),
+        ],
+    )
+    row_one = FlexBox(
+        layout="horizontal",
+        spacing="sm",
+        contents=[
             _build_language_chip(QUICK_LANGUAGE_ITEMS[1][0], QUICK_LANGUAGE_ITEMS[1][1], QUICK_LANGUAGE_ITEMS[1][2], current_language_code),
+            _build_language_chip(QUICK_LANGUAGE_ITEMS[2][0], QUICK_LANGUAGE_ITEMS[2][1], QUICK_LANGUAGE_ITEMS[2][2], current_language_code),
         ],
     )
     row_two = FlexBox(
         layout="horizontal",
         spacing="sm",
         contents=[
-            _build_language_chip(QUICK_LANGUAGE_ITEMS[2][0], QUICK_LANGUAGE_ITEMS[2][1], QUICK_LANGUAGE_ITEMS[2][2], current_language_code),
             _build_language_chip(QUICK_LANGUAGE_ITEMS[3][0], QUICK_LANGUAGE_ITEMS[3][1], QUICK_LANGUAGE_ITEMS[3][2], current_language_code),
+            _build_language_chip(QUICK_LANGUAGE_ITEMS[4][0], QUICK_LANGUAGE_ITEMS[4][1], QUICK_LANGUAGE_ITEMS[4][2], current_language_code),
         ],
     )
     row_three = FlexBox(
         layout="horizontal",
         spacing="sm",
         contents=[
-            _build_language_chip(QUICK_LANGUAGE_ITEMS[4][0], QUICK_LANGUAGE_ITEMS[4][1], QUICK_LANGUAGE_ITEMS[4][2], current_language_code),
             _build_language_chip(QUICK_LANGUAGE_ITEMS[5][0], QUICK_LANGUAGE_ITEMS[5][1], QUICK_LANGUAGE_ITEMS[5][2], current_language_code),
+            _build_language_chip(QUICK_LANGUAGE_ITEMS[6][0], QUICK_LANGUAGE_ITEMS[6][1], QUICK_LANGUAGE_ITEMS[6][2], current_language_code),
         ],
     )
     row_four = FlexBox(
         layout="horizontal",
         spacing="sm",
         contents=[
-            _build_language_chip(QUICK_LANGUAGE_ITEMS[6][0], QUICK_LANGUAGE_ITEMS[6][1], QUICK_LANGUAGE_ITEMS[6][2], current_language_code),
             _build_language_chip(QUICK_LANGUAGE_ITEMS[7][0], QUICK_LANGUAGE_ITEMS[7][1], QUICK_LANGUAGE_ITEMS[7][2], current_language_code),
-        ],
-    )
-    row_five = FlexBox(
-        layout="horizontal",
-        spacing="sm",
-        contents=[
             _build_language_chip(QUICK_LANGUAGE_ITEMS[8][0], QUICK_LANGUAGE_ITEMS[8][1], QUICK_LANGUAGE_ITEMS[8][2], current_language_code),
-            FlexFiller(),
         ],
     )
 
@@ -169,11 +178,11 @@ def _build_quick_language_section(
             "關閉自動偵測" if auto_detect_enabled else "啟用自動偵測",
             mode_button_color,
         ),
+        row_top,
         row_one,
         row_two,
         row_three,
         row_four,
-        row_five,
     ]  # 建立語言雙欄區
 
 
@@ -188,8 +197,6 @@ def build_main_menu_card(
     mode_name = "群組翻譯模式" if is_group_mode else "個人模式"  # 模式名稱
     mode_banner_color = THEME_GROUP if is_group_mode else THEME_PERSONAL_LIGHT  # 模式色系
     mode_button_color = THEME_GROUP if is_group_mode else THEME_PERSONAL  # 模式按鈕主色
-    auto_detect_enabled = auto_detect_enabled or (current_language_code == "zh-TW" and not is_group_mode)  # 個人模式未指定時以中文語言視為啟用
-
     group_tip = "群組中可複選語言，之後每句都會固定翻譯。"  # 群組功能描述
     group_action = "查看群組設定"  # 群組按鈕預設動作
     group_label = "👥【群組翻譯】群組語言管理"  # 群組按鈕預設文字
