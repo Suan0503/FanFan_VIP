@@ -25,6 +25,7 @@ from app.services.id_service import generate_member_code  # 匯入編號服務
 from app.services.translation_service import translate_text  # 匯入翻譯服務
 from app.services.permission_service import can_manage_group  # 匯入權限服務
 from app.ui.menu_cards import build_main_menu_card, build_language_setting_card  # 匯入新版 Flex 小卡
+from app.ui.welcome_i18n import get_welcome_i18n
 from app.fanfan_core.language_profile import resolve_language_code, parse_language_labels  # 匯入舊版語言解析核心
 from app.fanfan_core.group_service import ensure_group_exists, toggle_or_set_languages, reset_languages  # 匯入舊版群組設定核心
 from app.fanfan_core.formatting import format_language_updated, format_translation_results, detect_source_language  # 匯入舊版輸出格式核心
@@ -51,14 +52,14 @@ line_handler = WebhookHandler(settings.line_channel_secret)  # 建立 webhook ha
 
 語言模式顯示 = {
     "zh-TW": "TW 中文",
-    "en": "US 英文",
-    "th": "TH 泰文",
-    "ja": "JP 日文",
-    "vi": "VN 越南文",
-    "ko": "KR 韓文",
-    "id": "ID 印尼文",
-    "my": "MM 緬甸文",
-    "ru": "RU 俄文",
+    "en": "US English",
+    "th": "TH ไทย",
+    "ja": "JP 日本語",
+    "vi": "VN Tiếng Việt",
+    "ko": "KR 한국어",
+    "id": "ID Bahasa Indonesia",
+    "my": "MM မြန်မာ",
+    "ru": "RU Русский",
 }  # 語言模式顯示文字
 
 
@@ -145,19 +146,20 @@ def _建立智慧配置歡迎訊息(member_code: str, profile: dict[str, str | b
     language_mode = 語言模式顯示.get(language_code, "US 英文")
     region_name = str(profile.get("region_name", "美國 USA"))
     service_node = str(profile.get("service_node", "Global｜US"))
+    i18n = get_welcome_i18n(language_code)
     return (
-        "🌏 FanFan VIP｜翻翻君 V1.0\n"
-        "智慧翻譯系統已啟動\n"
+        f"{i18n['title']}\n"
+        f"{i18n['started']}\n"
         "━━━━━━━━━━━━━━\n\n"
-        "🆔 帳號編號\n"
+        f"{i18n['account_id']}\n"
         f"{member_code}\n\n"
-        "🟢 系統狀態\n"
-        "正常運作中\n\n"
-        "🌏 智慧地區配置\n"
-        f"已自動偵測：{region_name}\n\n"
-        "⚙ 自動配置完成\n"
-        f"語言模式：{language_mode}\n"
-        f"服務節點：{service_node}\n"
+        f"{i18n['system_status']}\n"
+        f"{i18n['running']}\n\n"
+        f"{i18n['smart_region']}\n"
+        f"{i18n['auto_detected'].format(region=region_name)}\n\n"
+        f"{i18n['auto_config_done']}\n"
+        f"{i18n['language_mode'].format(mode=language_mode)}\n"
+        f"{i18n['service_node'].format(node=service_node)}\n"
         "━━━━━━━━━━━━━━"
     )  # 回傳新版歡迎訊息
 
