@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import os
 import subprocess
 import tempfile
+from urllib.parse import quote
 
 import requests
 
@@ -24,9 +25,15 @@ http.headers.update({"User-Agent": "FanFanVIP/1.0 (travel-assistant)"})
 @dataclass
 class TravelSnapshot:
     region_name: str
-    landmarks: list[str]
-    restaurants: list[str]
+    landmarks: list["TravelPlace"]
+    restaurants: list["TravelPlace"]
     exchange_rate: str | None = None
+
+
+@dataclass
+class TravelPlace:
+    name: str
+    google_maps_url: str
 
 
 @dataclass
@@ -50,7 +57,12 @@ def reverse_geocode(latitude: float, longitude: float) -> str:
     return str(payload.get("display_name") or "Unknown area")
 
 
-def _overpass_nearby(latitude: float, longitude: float, query_tag: str, radius_m: int = 1200) -> list[str]:
+def _build_google_maps_url(name: str, latitude: float, longitude: float) -> str:
+    query = quote(f"{name} {latitude},{longitude}")
+    return f"https://www.google.com/maps/search/?api=1&query={query}"
+
+
+def _overpass_nearby(latitude: float, longitude: float, query_tag: str, radius_m: int = 1200) -> list[TravelPlace]:
     query = f"""
 [out:json][timeout:20];
 (
@@ -64,15 +76,35 @@ out center 12;
     response.raise_for_status()
     elements = response.json().get("elements", [])
 
-    names: list[str] = []
+    places: list[TravelPlace] = []
+    seen_names: set[str] = set()
     for item in elements:
         tags = item.get("tags", {})
         name = tags.get("name") or tags.get("name:en")
-        if isinstance(name, str) and name.strip() and name not in names:
-            names.append(name.strip())
-        if len(names) >= 5:
+        if not isinstance(name, str) or not name.strip():
+            continue
+        normalized_name = name.strip()
+        if normalized_name in seen_names:
+            continue
+        center = item.get("center", {}) if isinstance(item.get("center"), dict) else {}
+        item_lat = item.get("lat", center.get("lat", latitude))
+        item_lon = item.get("lon", center.get("lon", longitude))
+        try:
+            place_lat = float(item_lat)
+            place_lon = float(item_lon)
+        except (TypeError, ValueError):
+            place_lat = latitude
+            place_lon = longitude
+        places.append(
+            TravelPlace(
+                name=normalized_name,
+                google_maps_url=_build_google_maps_url(normalized_name, place_lat, place_lon),
+            )
+        )
+        seen_names.add(normalized_name)
+        if len(places) >= 5:
             break
-    return names
+    return places
 
 
 def _parse_preferences(user_query: str | None) -> TravelPreference:
@@ -126,6 +158,16 @@ def _build_food_query(preference: TravelPreference) -> str:
     return 'amenity="restaurant"'
 
 
+def build_travel_progress_text(language_code: str) -> str:
+    i18n = get_travel_result_i18n(language_code)
+    return (
+        f"{i18n['progress_title']}\n"
+        f"[▓░░] {i18n['progress_region']}\n"
+        f"[▓▓░] {i18n['progress_places']}\n"
+        f"[▓▓▓] {i18n['progress_ai']}"
+    )
+
+
 def _try_groq_summary(prompt: str) -> str | None:
     if not settings.groq_api_key.strip():
         return None
@@ -169,8 +211,16 @@ def _try_google_summary(prompt: str) -> str | None:
 
 def _fallback_summary(snapshot: TravelSnapshot, language_code: str, preference: TravelPreference) -> str:
     i18n = get_travel_result_i18n(language_code)
-    landmarks = "、".join(snapshot.landmarks) if snapshot.landmarks else i18n["no_data"]
-    restaurants = "、".join(snapshot.restaurants) if snapshot.restaurants else i18n["no_data"]
+    landmarks = (
+        "\n\n".join(f"{place.name}\n{place.google_maps_url}" for place in snapshot.landmarks)
+        if snapshot.landmarks
+        else i18n["no_data"]
+    )
+    restaurants = (
+        "\n\n".join(f"{place.name}\n{place.google_maps_url}" for place in snapshot.restaurants)
+        if snapshot.restaurants
+        else i18n["no_data"]
+    )
     exchange_rate = snapshot.exchange_rate or i18n["no_data"]
     preference_line = ""
     if preference.summary:
@@ -261,7 +311,7 @@ def build_travel_reply(latitude: float, longitude: float, language_code: str, us
     prompt = (
         "You are FanFan travel assistant. Summarize nearby places in 4 short lines. "
         f"Language code: {language_code}. Region: {region}. "
-        f"Landmarks: {landmarks}. Restaurants: {restaurants}. Exchange rate: {exchange_rate}. "
+        f"Landmarks: {[place.name for place in landmarks]}. Restaurants: {[place.name for place in restaurants]}. Exchange rate: {exchange_rate}. "
         f"Traveler request: {user_query or 'none'}"
     )
 

@@ -26,7 +26,7 @@ from app.repositories.group_repository import (
     get_group_languages,
 )  # 匯入群組存取
 from app.services.id_service import generate_member_code  # 匯入編號服務
-from app.services.travel_assistant_service import build_travel_reply, transcribe_audio_with_whisper_open_source
+from app.services.travel_assistant_service import build_travel_progress_text, build_travel_reply, transcribe_audio_with_whisper_open_source
 from app.services.travel_context import consume_awaiting_location, get_last_location, mark_awaiting_location, set_last_location
 from app.services.translation_service import translate_text  # 匯入翻譯服務
 from app.services.permission_service import can_manage_group  # 匯入權限服務
@@ -718,10 +718,12 @@ def handle_location_message(event: MessageEvent) -> None:
             result = build_travel_reply(float(latitude), float(longitude), current_language_code)
         except Exception:
             result = travel_i18n["temporary_unavailable"]
+        progress_text = build_travel_progress_text(current_language_code)
 
         _reply_messages(
             reply_token,
             [
+                TextMessage(text=progress_text, quickReply=None, quoteToken=None),
                 TextMessage(text=result, quickReply=None, quoteToken=None),
                 build_main_menu_card(
                     source_type=source_type,
@@ -788,10 +790,12 @@ def handle_audio_message(event: MessageEvent) -> None:
         result = build_travel_reply(last_location[0], last_location[1], current_language_code, user_query=transcript)
     except Exception:
         result = travel_i18n["temporary_unavailable"]
+    progress_text = build_travel_progress_text(current_language_code)
 
     _reply_messages(
         reply_token,
         [
+            TextMessage(text=progress_text, quickReply=None, quoteToken=None),
             TextMessage(text=f"🎙 {transcript}\n\n{result}", quickReply=None, quoteToken=None),
         ],
     )

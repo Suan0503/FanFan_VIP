@@ -9,6 +9,10 @@ class TravelResultI18n(TypedDict):
     exchange_label: str
     no_data: str
     preference_label: str
+    progress_title: str
+    progress_region: str
+    progress_places: str
+    progress_ai: str
 
 
 TRAVEL_RESULT_I18N: dict[str, TravelResultI18n] = {
@@ -20,6 +24,10 @@ TRAVEL_RESULT_I18N: dict[str, TravelResultI18n] = {
         "exchange_label": "💱 匯率參考",
         "no_data": "暫無資料",
         "preference_label": "🎯 偏好條件",
+        "progress_title": "🧭 搜尋進度",
+        "progress_region": "定位與區域分析",
+        "progress_places": "附近地點搜尋",
+        "progress_ai": "AI整理回覆",
     },
     "en": {
         "title": "🧭 Travel Mode Results",
@@ -29,6 +37,10 @@ TRAVEL_RESULT_I18N: dict[str, TravelResultI18n] = {
         "exchange_label": "💱 Exchange Rate",
         "no_data": "No data",
         "preference_label": "🎯 Preferences",
+        "progress_title": "🧭 Search Progress",
+        "progress_region": "Location and area analysis",
+        "progress_places": "Nearby place lookup",
+        "progress_ai": "AI response drafting",
     },
     "ja": {
         "title": "🧭 旅行モード探索結果",
@@ -38,6 +50,10 @@ TRAVEL_RESULT_I18N: dict[str, TravelResultI18n] = {
         "exchange_label": "💱 為替情報",
         "no_data": "データなし",
         "preference_label": "🎯 条件",
+        "progress_title": "🧭 検索進捗",
+        "progress_region": "位置とエリア解析",
+        "progress_places": "周辺スポット検索",
+        "progress_ai": "AI応答生成",
     },
     "th": {
         "title": "🧭 ผลลัพธ์โหมดท่องเที่ยว",
@@ -47,6 +63,10 @@ TRAVEL_RESULT_I18N: dict[str, TravelResultI18n] = {
         "exchange_label": "💱 อัตราแลกเปลี่ยน",
         "no_data": "ไม่มีข้อมูล",
         "preference_label": "🎯 เงื่อนไข",
+        "progress_title": "🧭 ความคืบหน้าการค้นหา",
+        "progress_region": "ระบุตำแหน่งและวิเคราะห์พื้นที่",
+        "progress_places": "ค้นหาสถานที่ใกล้เคียง",
+        "progress_ai": "AI กำลังสรุปคำตอบ",
     },
     "vi": {
         "title": "🧭 Kết quả chế độ du lịch",
@@ -56,6 +76,10 @@ TRAVEL_RESULT_I18N: dict[str, TravelResultI18n] = {
         "exchange_label": "💱 Tỷ giá",
         "no_data": "Chưa có dữ liệu",
         "preference_label": "🎯 Tùy chọn",
+        "progress_title": "🧭 Tiến trình tìm kiếm",
+        "progress_region": "Định vị và phân tích khu vực",
+        "progress_places": "Tìm địa điểm gần đây",
+        "progress_ai": "AI tổng hợp phản hồi",
     },
     "ko": {
         "title": "🧭 여행 모드 탐색 결과",
@@ -65,6 +89,10 @@ TRAVEL_RESULT_I18N: dict[str, TravelResultI18n] = {
         "exchange_label": "💱 환율 정보",
         "no_data": "데이터 없음",
         "preference_label": "🎯 선호 조건",
+        "progress_title": "🧭 검색 진행도",
+        "progress_region": "위치 및 지역 분석",
+        "progress_places": "주변 장소 검색",
+        "progress_ai": "AI 응답 정리",
     },
     "id": {
         "title": "🧭 Hasil Mode Wisata",
@@ -74,6 +102,10 @@ TRAVEL_RESULT_I18N: dict[str, TravelResultI18n] = {
         "exchange_label": "💱 Kurs",
         "no_data": "Data belum tersedia",
         "preference_label": "🎯 Preferensi",
+        "progress_title": "🧭 Progres pencarian",
+        "progress_region": "Analisis lokasi dan area",
+        "progress_places": "Mencari tempat terdekat",
+        "progress_ai": "AI merangkum jawaban",
     },
     "my": {
         "title": "🧭 ခရီးသွားမုဒ် ရလဒ်",
@@ -83,6 +115,10 @@ TRAVEL_RESULT_I18N: dict[str, TravelResultI18n] = {
         "exchange_label": "💱 ငွေလဲနှုန်း",
         "no_data": "ဒေတာမရှိသေးပါ",
         "preference_label": "🎯 သတ်မှတ်ချက်",
+        "progress_title": "🧭 ရှာဖွေမှုအခြေအနေ",
+        "progress_region": "တည်နေရာနှင့်ဧရိယာခွဲခြမ်းစိတ်ဖြာမှု",
+        "progress_places": "အနီးအနားနေရာရှာဖွေမှု",
+        "progress_ai": "AI အဖြေပြင်ဆင်နေသည်",
     },
     "ru": {
         "title": "🧭 Результаты режима путешествий",
@@ -92,6 +128,10 @@ TRAVEL_RESULT_I18N: dict[str, TravelResultI18n] = {
         "exchange_label": "💱 Курс валют",
         "no_data": "Нет данных",
         "preference_label": "🎯 Предпочтения",
+        "progress_title": "🧭 Прогресс поиска",
+        "progress_region": "Определение локации и района",
+        "progress_places": "Поиск мест рядом",
+        "progress_ai": "AI формирует ответ",
     },
 }
 
