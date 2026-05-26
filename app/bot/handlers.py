@@ -4,11 +4,15 @@ from linebot.v3.messaging import (
     ApiClient,
     Configuration,
     FlexMessage,
+    LocationAction,
     MessagingApi,
+    MessagingApiBlob,
+    QuickReply,
+    QuickReplyItem,
     ReplyMessageRequest,
     TextMessage,
 )  # 匯入 Messaging API
-from linebot.v3.webhooks import FollowEvent, JoinEvent, MessageEvent, TextMessageContent  # 匯入事件型別
+from linebot.v3.webhooks import AudioMessageContent, FollowEvent, JoinEvent, LocationMessageContent, MessageEvent, TextMessageContent  # 匯入事件型別
 
 from app.core.config import settings  # 匯入設定
 from app.core.languages import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE_CODE  # 匯入語言設定
@@ -22,9 +26,13 @@ from app.repositories.group_repository import (
     get_group_languages,
 )  # 匯入群組存取
 from app.services.id_service import generate_member_code  # 匯入編號服務
+from app.services.travel_assistant_service import build_travel_reply, transcribe_audio_with_whisper_open_source
+from app.services.travel_context import consume_awaiting_location, get_last_location, mark_awaiting_location, set_last_location
 from app.services.translation_service import translate_text  # 匯入翻譯服務
 from app.services.permission_service import can_manage_group  # 匯入權限服務
 from app.ui.menu_cards import build_main_menu_card, build_language_setting_card  # 匯入新版 Flex 小卡
+from app.ui.travel_cards import build_travel_mode_card
+from app.ui.travel_i18n import get_travel_back_commands, get_travel_confirm_commands, get_travel_entry_commands, get_travel_i18n
 from app.ui.welcome_i18n import get_welcome_i18n
 from app.fanfan_core.language_profile import resolve_language_code, parse_language_labels  # 匯入舊版語言解析核心
 from app.fanfan_core.group_service import ensure_group_exists, toggle_or_set_languages, reset_languages  # 匯入舊版群組設定核心
@@ -44,12 +52,13 @@ line_handler = WebhookHandler(settings.line_channel_secret)  # 建立 webhook ha
 自動偵測關閉指令 = {"關閉自動偵測"}  # 關閉自動偵測
 即時翻譯啟用指令 = {"開啟即時翻譯"}  # 開啟即時翻譯
 即時翻譯關閉指令 = {"關閉即時翻譯"}  # 關閉即時翻譯
+旅遊模式指令 = get_travel_entry_commands()  # 旅遊模式入口（依語言模組自動彙整）
+旅遊模式確認指令 = get_travel_confirm_commands()  # 同意並分享定位（依語言模組自動彙整）
+旅遊模式返回指令 = get_travel_back_commands()  # 取消並返回主選單（依語言模組自動彙整）
 
 即時翻譯狀態: dict[str, bool] = {}  # 依使用情境保存即時翻譯開關
 自動偵測狀態: dict[str, bool] = {}  # 依使用情境保存自動偵測開關
 使用者智慧配置: dict[str, dict[str, str | bool]] = {}  # 使用者地區與語言自動配置
-
-
 語言模式顯示 = {
     "zh-TW": "TW 中文",
     "en": "US English",
@@ -246,6 +255,39 @@ def _reply_messages(reply_token: str, messages: list[TextMessage | FlexMessage])
         )  # 回覆文字
 
 
+def _download_message_content(message_id: str) -> bytes | None:
+    with ApiClient(configuration) as api_client:
+        blob_api = MessagingApiBlob(api_client)
+        try:
+            raw = blob_api.get_message_content(message_id=message_id)
+        except Exception:
+            return None
+
+    if isinstance(raw, (bytes, bytearray)):
+        return bytes(raw)
+    data = getattr(raw, "data", None)
+    if isinstance(data, (bytes, bytearray)):
+        return bytes(data)
+    reader = getattr(raw, "read", None)
+    if callable(reader):
+        try:
+            content = reader()
+        except Exception:
+            return None
+        if isinstance(content, (bytes, bytearray)):
+            return bytes(content)
+    return None
+
+
+def _current_language_code(source_type: str, user, group_id: str | None, db) -> str:
+    if source_type == "group" and group_id:
+        group_codes = get_group_languages(db, group_id)
+        return group_codes[0] if group_codes else DEFAULT_LANGUAGE_CODE
+    if user and getattr(user, "target_language", None):
+        return user.target_language
+    return DEFAULT_LANGUAGE_CODE
+
+
 @line_handler.add(FollowEvent)
 def handle_follow(event: FollowEvent) -> None:
     reply_token = event.reply_token  # 取得回覆 token
@@ -381,6 +423,62 @@ def handle_text_message(event: MessageEvent) -> None:
                     ),
                 ],
             )  # 顯示主選單小卡
+            return
+
+        if text_for_command in 旅遊模式指令:
+            current_language_code = _current_language_code(source_type, user, group_id, db)
+            _reply_messages(
+                reply_token,
+                [
+                    build_travel_mode_card(current_language_code),
+                ],
+            )
+            return
+
+        if text_for_command in 旅遊模式確認指令:
+            if not user_id:
+                _reply_text(reply_token, "無法識別使用者，請稍後再試。")
+                return
+            current_language_code = _current_language_code(source_type, user, group_id, db)
+            travel_i18n = get_travel_i18n(current_language_code)
+            mark_awaiting_location(user_id)
+            _reply_messages(
+                reply_token,
+                [
+                    TextMessage(
+                        text=travel_i18n["location_prompt"],
+                        quickReply=QuickReply(
+                            items=[
+                                QuickReplyItem(
+                                    action=LocationAction(label=travel_i18n["location_quick_reply_label"]),
+                                )
+                            ]
+                        ),
+                        quoteToken=None,
+                    )
+                ],
+            )
+            return
+
+        if text_for_command in 旅遊模式返回指令:
+            selected_codes = get_group_languages(db, group_id) if group_id else [user.target_language] if user else [DEFAULT_LANGUAGE_CODE]
+            state_key = _狀態鍵(source_type, user_id, group_id)
+            translation_enabled, auto_detect_enabled = _目前開關狀態(
+                state_key,
+                default_auto_detect=(source_type != "group"),
+            )
+            _reply_messages(
+                reply_token,
+                [
+                    build_main_menu_card(
+                        source_type=source_type,
+                        is_group_manager=is_group_manager,
+                        current_language_code=selected_codes[0] if selected_codes else DEFAULT_LANGUAGE_CODE,
+                        translation_enabled=translation_enabled,
+                        auto_detect_enabled=auto_detect_enabled,
+                    ),
+                ],
+            )
             return
 
         if text_for_command in 說明指令:
@@ -583,3 +681,117 @@ def verify_signature(body: str, signature: str) -> None:
         line_handler.handle(body, signature)  # 驗證並分派事件
     except InvalidSignatureError as exc:
         raise ValueError("Invalid LINE signature") from exc  # 包裝簽章錯誤
+
+
+@line_handler.add(MessageEvent, message=LocationMessageContent)
+def handle_location_message(event: MessageEvent) -> None:
+    reply_token = event.reply_token
+    if not reply_token:
+        return
+
+    source_type = getattr(event.source, "type", "")
+    user_id = getattr(event.source, "user_id", None)
+    group_id = getattr(event.source, "group_id", None) if source_type == "group" else None
+
+    latitude = getattr(event.message, "latitude", None)
+    longitude = getattr(event.message, "longitude", None)
+    if latitude is None or longitude is None:
+        _reply_text(reply_token, "無法取得定位資訊，請再試一次。")
+        return
+
+    with SessionLocal() as db:
+        user = get_user_by_line_id(db, user_id) if user_id else None
+        current_language_code = _current_language_code(source_type, user, group_id, db)
+        travel_i18n = get_travel_i18n(current_language_code)
+
+        if not user_id:
+            _reply_text(reply_token, travel_i18n["not_enabled_yet"])
+            return
+
+        set_last_location(user_id, float(latitude), float(longitude))
+
+        if not consume_awaiting_location(user_id):
+            _reply_text(reply_token, travel_i18n["not_enabled_yet"])
+            return
+
+        try:
+            result = build_travel_reply(float(latitude), float(longitude), current_language_code)
+        except Exception:
+            result = travel_i18n["temporary_unavailable"]
+
+        _reply_messages(
+            reply_token,
+            [
+                TextMessage(text=result, quickReply=None, quoteToken=None),
+                build_main_menu_card(
+                    source_type=source_type,
+                    is_group_manager=False,
+                    current_language_code=current_language_code,
+                    translation_enabled=True,
+                    auto_detect_enabled=自動偵測狀態.get(_狀態鍵(source_type, user_id, group_id), source_type != "group"),
+                ),
+            ],
+        )
+
+
+@line_handler.add(MessageEvent, message=AudioMessageContent)
+def handle_audio_message(event: MessageEvent) -> None:
+    reply_token = event.reply_token
+    if not reply_token:
+        return
+
+    source_type = getattr(event.source, "type", "")
+    user_id = getattr(event.source, "user_id", None)
+    group_id = getattr(event.source, "group_id", None) if source_type == "group" else None
+
+    with SessionLocal() as db:
+        user = get_user_by_line_id(db, user_id) if user_id else None
+        current_language_code = _current_language_code(source_type, user, group_id, db)
+        travel_i18n = get_travel_i18n(current_language_code)
+
+    if not user_id:
+        _reply_text(reply_token, travel_i18n["audio_need_location"])
+        return
+
+    last_location = get_last_location(user_id)
+    if not last_location:
+        _reply_messages(
+            reply_token,
+            [
+                TextMessage(
+                    text=travel_i18n["audio_need_location"],
+                    quickReply=QuickReply(
+                        items=[QuickReplyItem(action=LocationAction(label=travel_i18n["location_quick_reply_label"]))]
+                    ),
+                    quoteToken=None,
+                )
+            ],
+        )
+        return
+
+    message_id = str(getattr(event.message, "id", ""))
+    if not message_id:
+        _reply_text(reply_token, travel_i18n["audio_transcribe_failed"])
+        return
+
+    audio_bytes = _download_message_content(message_id)
+    if not audio_bytes:
+        _reply_text(reply_token, travel_i18n["audio_transcribe_failed"])
+        return
+
+    transcript = transcribe_audio_with_whisper_open_source(audio_bytes)
+    if not transcript:
+        _reply_text(reply_token, travel_i18n["audio_transcribe_failed"])
+        return
+
+    try:
+        result = build_travel_reply(last_location[0], last_location[1], current_language_code, user_query=transcript)
+    except Exception:
+        result = travel_i18n["temporary_unavailable"]
+
+    _reply_messages(
+        reply_token,
+        [
+            TextMessage(text=f"🎙 {transcript}\n\n{result}", quickReply=None, quoteToken=None),
+        ],
+    )
