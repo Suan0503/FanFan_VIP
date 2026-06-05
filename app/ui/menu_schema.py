@@ -1,4 +1,4 @@
-from typing import TypedDict
+﻿from typing import TypedDict
 
 
 class MenuI18n(TypedDict):
@@ -31,3 +31,4 @@ class MenuI18n(TypedDict):
     auto_detect_status_off: str
     auto_detect_button_template: str
     tutorial_2_template: str
+

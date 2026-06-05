@@ -10,7 +10,8 @@
 )
 
 from app.core.languages import SUPPORTED_LANGUAGES
-from app.ui.menu_i18n import MenuI18n, get_menu_i18n
+from app.ui.menu_registry import get_menu_i18n
+from app.ui.menu_schema import MenuI18n
 from app.ui.travel_i18n import get_travel_i18n
 
 
@@ -603,3 +604,4 @@ def build_main_menu_json(
         return menu_message.to_dict()
 
     return {"altText": menu_message.alt_text, "contents": {}}
+

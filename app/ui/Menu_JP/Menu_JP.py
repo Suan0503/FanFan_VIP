@@ -1,4 +1,4 @@
-from app.ui.menu_i18n.schema import MenuI18n
+﻿from app.ui.menu_schema import MenuI18n
 
 
 MENU_JA: MenuI18n = {
@@ -32,3 +32,4 @@ MENU_JA: MenuI18n = {
     "auto_detect_button_template": "🧠 {status} 自動検出モード（非{target} -> {target}）",
     "tutorial_2_template": "2. 自動検出で非{target}を{target}へ翻訳",
 }
+

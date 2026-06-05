@@ -1,4 +1,4 @@
-from app.ui.menu_i18n.schema import MenuI18n
+﻿from app.ui.menu_schema import MenuI18n
 
 
 MENU_EN: MenuI18n = {
@@ -32,3 +32,4 @@ MENU_EN: MenuI18n = {
     "auto_detect_button_template": "🧠 {status} Auto Detect Mode (Non-{target} -> {target})",
     "tutorial_2_template": "2. Enable auto detect for Non-{target} -> {target}",
 }
+

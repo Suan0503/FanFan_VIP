@@ -1,4 +1,4 @@
-from app.ui.menu_i18n.schema import MenuI18n
+﻿from app.ui.menu_schema import MenuI18n
 
 
 MENU_VI: MenuI18n = {
@@ -32,3 +32,4 @@ MENU_VI: MenuI18n = {
     "auto_detect_button_template": "🧠 {status} chế độ tự nhận diện (không phải {target} -> {target})",
     "tutorial_2_template": "2. Bật tự nhận diện cho ngôn ngữ không phải {target} -> {target}",
 }
+

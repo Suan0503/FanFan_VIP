@@ -1,4 +1,4 @@
-from app.ui.menu_i18n.schema import MenuI18n
+﻿from app.ui.menu_schema import MenuI18n
 
 
 MENU_TH: MenuI18n = {
@@ -32,3 +32,4 @@ MENU_TH: MenuI18n = {
     "auto_detect_button_template": "🧠 {status} โหมดตรวจจับอัตโนมัติ ({target} อื่น -> {target})",
     "tutorial_2_template": "2. เปิดโหมดตรวจจับอัตโนมัติสำหรับภาษาที่ไม่ใช่ {target} -> {target}",
 }
+

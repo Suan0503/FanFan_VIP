@@ -1,4 +1,4 @@
-from app.ui.menu_i18n.schema import MenuI18n
+﻿from app.ui.menu_schema import MenuI18n
 
 
 MENU_MY: MenuI18n = {
@@ -32,3 +32,4 @@ MENU_MY: MenuI18n = {
     "auto_detect_button_template": "🧠 {status} အလိုအလျောက်ရှာဖွေမှု ({target} မဟုတ် -> {target})",
     "tutorial_2_template": "2. Auto detect ဖြင့် {target} မဟုတ် -> {target} ပြောင်းပါ",
 }
+
