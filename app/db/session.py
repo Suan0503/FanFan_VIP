@@ -19,6 +19,7 @@ def init_db() -> None:
 
 def _ensure_group_name_cache_columns() -> None:
     inspector = inspect(engine)
+    dialect_name = engine.dialect.name.lower()
     table_names = set(inspector.get_table_names())
     if "group_settings" not in table_names:
         return
@@ -28,7 +29,10 @@ def _ensure_group_name_cache_columns() -> None:
     if "group_name" not in columns:
         statements.append("ALTER TABLE group_settings ADD COLUMN group_name VARCHAR(255)")
     if "group_name_synced_at" not in columns:
-        statements.append("ALTER TABLE group_settings ADD COLUMN group_name_synced_at DATETIME")
+        if dialect_name == "postgresql":
+            statements.append("ALTER TABLE group_settings ADD COLUMN group_name_synced_at TIMESTAMP")
+        else:
+            statements.append("ALTER TABLE group_settings ADD COLUMN group_name_synced_at DATETIME")
 
     if not statements:
         return
