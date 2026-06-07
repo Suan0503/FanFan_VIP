@@ -24,6 +24,7 @@ from app.repositories.group_repository import (
     bind_group_inviter,
     set_group_inviter,
     get_group_languages,
+    set_group_languages,
 )  # 匯入群組存取
 from app.services.id_service import generate_member_code  # 匯入編號服務
 from app.services.travel_assistant_service import build_travel_progress_text, build_travel_reply, transcribe_audio_with_whisper_open_source
@@ -83,6 +84,8 @@ line_handler = WebhookHandler(settings.line_channel_secret)  # 建立 webhook ha
     "my": ("緬甸 Myanmar", "Asia｜Myanmar"),
     "ru": ("俄羅斯 Russia", "Europe｜Russia"),
 }  # 語言對應地區與節點
+
+群組語言上限 = 2  # 群組翻譯最多僅支援兩種語言
 
 
 def _狀態鍵(source_type: str, user_id: str | None, group_id: str | None) -> str:
@@ -194,6 +197,26 @@ def _自動偵測目標語言(source_type: str, user, group_id: str | None, db) 
     if user and getattr(user, "target_language", None):
         return user.target_language  # 個人模式沿用目前選單語言
     return DEFAULT_LANGUAGE_CODE  # 無資料時回退預設語言
+
+
+def _智慧偵測群組語言(db, group_id: str, text: str) -> tuple[list[str], str | None]:
+    current_codes = get_group_languages(db, group_id)  # 目前群組語言
+    if not current_codes:
+        current_codes = [DEFAULT_LANGUAGE_CODE]
+
+    detected_code = _文字偵測語言代碼(text)  # 從訊息內容偵測語言
+    if detected_code in {DEFAULT_LANGUAGE_CODE, "en"}:
+        return current_codes, None  # 中文與英文不觸發語言擴充
+
+    if detected_code in current_codes:
+        return current_codes, None  # 已存在語言不變更
+
+    if len(current_codes) >= 群組語言上限:
+        return current_codes, "ℹ 群組智慧翻譯僅支援 2 種語言，維持目前設定。"
+
+    next_codes = [DEFAULT_LANGUAGE_CODE, detected_code]  # 固定中文為主語，第二語言自動加入
+    updated_codes = set_group_languages(db, group_id, next_codes)
+    return updated_codes, f"🧠 已啟用智慧雙語：{_群組語言摘要(updated_codes)}（最多 2 種語言）"
 
 
 def _標準化指令文字(text: str) -> str:
@@ -322,9 +345,11 @@ def handle_follow(event: FollowEvent) -> None:
     _reply_text(
         reply_token,
         "⚙ 正在等待智慧地區配置\n"
-        "請先傳送第一句訊息，我會自動偵測地區與語言後完成啟動。\n\n"
+        "請用自己國家語言輸入：你好\n"
+        "我會自動偵測地區與語言後完成啟動。\n\n"
         "⚙ Smart region setup is pending.\n"
-        "Please send your first message, and I will auto-detect your region and language to complete activation.",
+        "Please type 'hello' in your native language.\n"
+        "I will auto-detect your region and language to complete activation.",
     )  # 無 language 時先等待第一句（中英雙語）
 
 
@@ -346,7 +371,7 @@ def handle_join(event: JoinEvent) -> None:
         reply_token,
         [
             TextMessage(
-                text="翻翻君已加入群組！\n請先輸入 /選單 或 /menu 開啟功能選單。\n若要管理群組語言，請邀請者再輸入：綁定邀請者。",
+                text="翻翻君已加入群組！\n目前為智慧偵測模式：預設中文，偵測到第二語言會自動切換為雙語翻譯。\n英文訊息會直接翻譯成群組內兩種語言（最多 2 種）。\n請先輸入 /選單 或 /menu 開啟功能選單。\n若要管理群組語言，請邀請者再輸入：綁定邀請者。",
                 quickReply=None,
                 quoteToken=None,
             ),
@@ -552,15 +577,32 @@ def handle_text_message(event: MessageEvent) -> None:
                 _reply_text(reply_token, f"以下語言不支援：{'、'.join(invalid_labels)}", with_language_menu=True)  # 語言不存在
                 return
 
+            unique_selected_codes: list[str] = []
+            for code in selected_codes:
+                if code not in unique_selected_codes:
+                    unique_selected_codes.append(code)  # 保留順序並去重
+
             if source_type == "group" and group_id:
                 group = current_group or ensure_group_exists(db, group_id)  # 取得群組設定
                 if not can_manage_group(group, user, user_id):
                     _reply_text(reply_token, "你沒有群組設定權限，僅邀請者代表/管理員/所有者可設定。")  # 權限不足
                     return
+
+                current_codes = get_group_languages(db, group_id)
+                if len(unique_selected_codes) > 群組語言上限:
+                    _reply_text(reply_token, "群組翻譯最多只能設定 2 種語言。")
+                    return
+
+                if len(unique_selected_codes) == 1 and len(selected_labels) == 1:
+                    toggle_code = unique_selected_codes[0]
+                    if toggle_code not in current_codes and len(current_codes) >= 群組語言上限:
+                        _reply_text(reply_token, "群組翻譯最多只能設定 2 種語言，請先移除一種語言再新增。")
+                        return
+
                 updated_codes = toggle_or_set_languages(
                     db,
                     group_id,
-                    selected_codes,
+                    unique_selected_codes,
                     toggle_single=(len(selected_codes) == 1 and len(selected_labels) == 1),
                 )  # 使用舊版群組語言切換核心
 
@@ -659,8 +701,10 @@ def handle_text_message(event: MessageEvent) -> None:
         target_code = DEFAULT_LANGUAGE_CODE  # 預設語言
         if source_type == "group" and group_id:
             group = current_group or create_group(db, group_id)  # 取得群組設定
-            target_codes = get_group_languages(db, group_id)  # 採用群組多語設定
+            target_codes, smart_detect_notice = _智慧偵測群組語言(db, group_id, text)  # 智慧偵測第二語言
             translated_text = format_translation_results(text, target_codes, translate_text)  # 使用舊版核心輸出格式
+            if smart_detect_notice:
+                translated_text = f"{smart_detect_notice}\n\n{translated_text}"
             _reply_text(reply_token, translated_text)  # 回覆多語翻譯
             return
         elif user:
