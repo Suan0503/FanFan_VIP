@@ -32,7 +32,7 @@ from app.services.id_service import generate_member_code  # 匯入編號服務
 from app.services.vip_service import activate_vip_by_serial, generate_unique_vip_serial, get_vip_status
 from app.services.travel_assistant_service import build_travel_progress_text, build_travel_reply, transcribe_audio_with_whisper_open_source
 from app.services.travel_context import consume_awaiting_location, get_last_location, mark_awaiting_location, set_last_location
-from app.services.translation_service import translate_text  # 匯入翻譯服務
+from app.services.translation_service import translate_text, translate_text_vip_pro  # 匯入翻譯服務
 from app.services.permission_service import can_manage_group  # 匯入權限服務
 from app.ui.menu_cards import build_language_setting_card, build_main_menu_card, build_vip_main_menu_card  # 匯入新版 Flex 小卡
 from app.ui.travel_cards import build_travel_mode_card
@@ -91,7 +91,7 @@ line_handler = WebhookHandler(settings.line_channel_secret)  # 建立 webhook ha
 群組語言上限 = 2  # 群組翻譯最多僅支援兩種語言
 超級管理員ID = "U5ce6c382d12eaea28d98f2d48673b4b8"  # 超級管理員固定 ID
 
-VIP啟用指令 = {"開通VIP模式", "啟用VIP", "vip"}
+VIP啟用指令 = {"vip開通", "啟用VIP", "vip"}
 VIP主選單指令 = {"VIP主選單", "vip主選單"}
 VIP序號產生指令 = "產生序號"
 超管新增管理員指令 = "新增管理員"
@@ -282,19 +282,6 @@ def _抽取被提及用戶ID(message) -> str | None:
     return None
 
 
-def _解析產生序號天數(command_text: str) -> tuple[int, str | None]:
-    parts = command_text.split()
-    if len(parts) <= 1:
-        return 0, None
-    try:
-        extra_days = int(parts[1])
-    except ValueError:
-        return 0, "天數請輸入整數，例如：/產生序號 15"
-    if extra_days < 0:
-        return 0, "額外天數不可小於 0"
-    return extra_days, None
-
-
 def _vip是否啟用(vip_status) -> bool:
     return bool(vip_status and bool(vip_status.get("is_active", False)))
 
@@ -311,8 +298,8 @@ def _建立說明文字(source_type: str, is_group_manager: bool) -> str:
         "4. 指令說明 / 使用說明 / 幫助",
         "   顯示這份說明。",
         "5. 預設翻譯通道：DeepL（失敗時自動備援）。",
-        "6. 開通VIP模式",
-        "   輸入序號啟用 VIP，預設 30 天。",
+        "6. vip開通",
+        "   輸入序號啟用 VIP，預設 DeepL Pro 10萬字元。",
         "7. VIP主選單",
         "   查看開通時間、當前方案、剩餘字數。",
     ]  # 基礎說明
@@ -533,11 +520,6 @@ def handle_text_message(event: MessageEvent) -> None:
                 _reply_text(reply_token, "此指令僅限管理員使用。")
                 return
 
-            extra_days, parse_error = _解析產生序號天數(text)
-            if parse_error:
-                _reply_text(reply_token, parse_error)
-                return
-
             creator_name = _查詢顯示名稱(source_type, group_id, user_id)
             creator_code = user.member_code if user else None
             serial = generate_unique_vip_serial(
@@ -545,14 +527,13 @@ def handle_text_message(event: MessageEvent) -> None:
                 created_by_user_id=user_id or "",
                 created_by_name=creator_name,
                 created_by_member_code=creator_code,
-                extra_days=extra_days,
             )
             _reply_text(
                 reply_token,
                 "✅ 已產生 VIP 序號\n"
                 f"管理員名稱：{serial.created_by_name}\n"
                 f"序號號碼：{serial.serial_code}\n"
-                f"可用天數：{serial.total_days} 天（預設 30 + 追加 {serial.extra_days}）\n"
+                "方案：DeepL Pro 10萬字元\n"
                 "狀態：未使用",
             )
             return
@@ -567,7 +548,7 @@ def handle_text_message(event: MessageEvent) -> None:
 
         if text_for_command in VIP主選單指令:
             if not vip_enabled or not vip_status:
-                _reply_text(reply_token, "你目前尚未啟用 VIP，請先點選『開通VIP模式』並輸入序號。")
+                _reply_text(reply_token, "你目前尚未啟用 VIP，請先點選『vip開通』並輸入序號。")
                 return
             _reply_messages(
                 reply_token,
@@ -917,7 +898,8 @@ def handle_text_message(event: MessageEvent) -> None:
                 _reply_text(reply_token, f"翻譯結果：\n{text}")  # 中文原文直接回傳
                 return
 
-        translated = translate_text(text, target_code)  # 執行翻譯
+        translate_func = translate_text_vip_pro if (source_type == "user" and vip_enabled) else translate_text
+        translated = translate_func(text, target_code)  # 執行翻譯
         _reply_text(reply_token, f"翻譯結果：\n{translated}")  # 回覆翻譯結果
 
 

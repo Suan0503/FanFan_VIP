@@ -291,7 +291,7 @@ def build_main_menu_card(
     group_tip = i18n["group_tip_group"]
     group_action = "查看群組設定"
     group_label = i18n["btn_group_manage"]
-    vip_command = "VIP主選單" if vip_enabled else "開通VIP模式"
+    vip_command = "VIP主選單" if vip_enabled else "vip開通"
 
     if source_type != "group":
         group_tip = i18n["group_tip_personal"]
@@ -487,7 +487,7 @@ def build_vip_main_menu_card(
                 FlexButton(
                     style="primary",
                     color="#8B6B2D",
-                    action=MessageAction(label=_safe_action_label("序號開通"), text="開通VIP模式"),
+                    action=MessageAction(label=_safe_action_label("序號開通"), text="vip開通"),
                     cornerRadius="14px",
                     height="sm",
                     margin="md",

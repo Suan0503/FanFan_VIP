@@ -14,9 +14,8 @@ from app.repositories.vip_repository import (
 
 VIP_SERIAL_PREFIX = "FANVIP"
 VIP_SERIAL_TOTAL_LENGTH = 16
-VIP_BASE_DAYS = 30
-VIP_DEFAULT_REMAINING_CHARS = 300000
-VIP_CHAR_BONUS_PER_ACTIVATION = 300000
+VIP_DEFAULT_REMAINING_CHARS = 100000
+VIP_CHAR_BONUS_PER_ACTIVATION = 100000
 
 
 def _build_serial_candidate() -> str:
@@ -30,12 +29,7 @@ def generate_unique_vip_serial(
     created_by_user_id: str,
     created_by_name: str,
     created_by_member_code: str | None,
-    extra_days: int = 0,
 ):
-    base_days = VIP_BASE_DAYS
-    safe_extra_days = max(extra_days, 0)
-    total_days = base_days + safe_extra_days
-
     while True:
         serial_code = _build_serial_candidate()
         if not get_vip_serial_by_code(db, serial_code):
@@ -45,9 +39,9 @@ def generate_unique_vip_serial(
                 created_by_user_id=created_by_user_id,
                 created_by_name=created_by_name,
                 created_by_member_code=created_by_member_code,
-                base_days=base_days,
-                extra_days=safe_extra_days,
-                total_days=total_days,
+                base_days=0,
+                extra_days=0,
+                total_days=0,
             )
 
 
@@ -62,15 +56,12 @@ def activate_vip_by_serial(db: Session, line_user_id: str, member_code: str, ser
     now = datetime.utcnow()
     current = get_vip_subscription(db, line_user_id)
     activation_start = now
-    if current and current.expires_at > now:
-        activation_start = current.expires_at
-
-    expires_at = activation_start + timedelta(days=serial.total_days)
+    expires_at = now + timedelta(days=3650)  # 字元制方案，時間僅作狀態欄位用途
     remaining_chars = VIP_DEFAULT_REMAINING_CHARS
     if current:
         remaining_chars = max(current.remaining_chars, 0) + VIP_CHAR_BONUS_PER_ACTIVATION
 
-    plan_name = f"VIP-{serial.total_days}D"
+    plan_name = "VIP-DEEPL-PRO-100K"
     subscription = upsert_vip_subscription(
         db=db,
         line_user_id=line_user_id,
@@ -89,8 +80,7 @@ def get_vip_status(db: Session, line_user_id: str):
     if not row:
         return None
 
-    now = datetime.utcnow()
-    is_active = row.expires_at > now
+    is_active = row.remaining_chars > 0
     return {
         "is_active": is_active,
         "started_at": row.started_at,
