@@ -38,3 +38,41 @@ class GroupLanguageSelection(Base):
     line_group_id: Mapped[str] = mapped_column(String(64), ForeignKey("group_settings.line_group_id"), nullable=False)  # 群組 ID
     language_code: Mapped[str] = mapped_column(String(16), nullable=False)  # 語言代碼
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 建立時間
+
+
+class VIPSerialCode(Base):
+    __tablename__ = "vip_serial_codes"  # VIP 序號資料表
+    __table_args__ = (
+        UniqueConstraint("serial_code", name="uq_vip_serial_code"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)  # 主鍵
+    serial_code: Mapped[str] = mapped_column(String(32), nullable=False)  # 序號
+    created_by_user_id: Mapped[str] = mapped_column(String(64), nullable=False)  # 產生者 LINE ID
+    created_by_name: Mapped[str] = mapped_column(String(128), nullable=False)  # 產生者顯示名稱
+    created_by_member_code: Mapped[str | None] = mapped_column(String(16), nullable=True)  # 產生者會員編號
+    base_days: Mapped[int] = mapped_column(nullable=False, default=30)  # 基礎天數
+    extra_days: Mapped[int] = mapped_column(nullable=False, default=0)  # 額外天數
+    total_days: Mapped[int] = mapped_column(nullable=False, default=30)  # 實際總天數
+    is_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 是否已使用
+    used_by_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)  # 使用者 LINE ID
+    used_by_member_code: Mapped[str | None] = mapped_column(String(16), nullable=True)  # 使用者會員編號
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # 使用時間
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 建立時間
+
+
+class VIPSubscription(Base):
+    __tablename__ = "vip_subscriptions"  # VIP 會員資料表
+    __table_args__ = (
+        UniqueConstraint("line_user_id", name="uq_vip_line_user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)  # 主鍵
+    line_user_id: Mapped[str] = mapped_column(String(64), nullable=False)  # 會員 LINE ID
+    member_code: Mapped[str] = mapped_column(String(16), nullable=False)  # 會員編號
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)  # 本次方案起始時間
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)  # 方案到期時間
+    current_plan: Mapped[str] = mapped_column(String(64), nullable=False, default="VIP-30D")  # 目前方案
+    remaining_chars: Mapped[int] = mapped_column(nullable=False, default=300000)  # 剩餘字數
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 建立時間
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 更新時間

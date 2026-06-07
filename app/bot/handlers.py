@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from linebot.v3 import WebhookHandler  # 匯入 Webhook Handler
 from linebot.v3.exceptions import InvalidSignatureError  # 匯入簽章錯誤
 from linebot.v3.messaging import (
@@ -12,12 +14,12 @@ from linebot.v3.messaging import (
     ReplyMessageRequest,
     TextMessage,
 )  # 匯入 Messaging API
-from linebot.v3.webhooks import AudioMessageContent, FollowEvent, JoinEvent, LocationMessageContent, MessageEvent, TextMessageContent  # 匯入事件型別
+from linebot.v3.webhooks import AudioMessageContent, FollowEvent, JoinEvent, LocationMessageContent, MemberJoinedEvent, MemberLeftEvent, MessageEvent, TextMessageContent  # 匯入事件型別
 
 from app.core.config import settings  # 匯入設定
 from app.core.languages import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE_CODE  # 匯入語言設定
 from app.db.session import SessionLocal  # 匯入資料庫 Session
-from app.repositories.user_repository import get_user_by_line_id, create_user, update_user_language  # 匯入使用者存取
+from app.repositories.user_repository import create_user, get_user_by_line_id, update_user_admin_flag, update_user_language  # 匯入使用者存取
 from app.repositories.group_repository import (
     get_group,
     create_group,
@@ -27,11 +29,12 @@ from app.repositories.group_repository import (
     set_group_languages,
 )  # 匯入群組存取
 from app.services.id_service import generate_member_code  # 匯入編號服務
+from app.services.vip_service import activate_vip_by_serial, generate_unique_vip_serial, get_vip_status
 from app.services.travel_assistant_service import build_travel_progress_text, build_travel_reply, transcribe_audio_with_whisper_open_source
 from app.services.travel_context import consume_awaiting_location, get_last_location, mark_awaiting_location, set_last_location
 from app.services.translation_service import translate_text  # 匯入翻譯服務
 from app.services.permission_service import can_manage_group  # 匯入權限服務
-from app.ui.menu_cards import build_main_menu_card, build_language_setting_card  # 匯入新版 Flex 小卡
+from app.ui.menu_cards import build_language_setting_card, build_main_menu_card, build_vip_main_menu_card  # 匯入新版 Flex 小卡
 from app.ui.travel_cards import build_travel_mode_card
 from app.ui.travel_i18n import get_travel_back_commands, get_travel_confirm_commands, get_travel_entry_commands, get_travel_i18n
 from app.ui.welcome_i18n import get_welcome_i18n
@@ -86,6 +89,15 @@ line_handler = WebhookHandler(settings.line_channel_secret)  # 建立 webhook ha
 }  # 語言對應地區與節點
 
 群組語言上限 = 2  # 群組翻譯最多僅支援兩種語言
+超級管理員ID = "U5ce6c382d12eaea28d98f2d48673b4b8"  # 超級管理員固定 ID
+
+VIP啟用指令 = {"開通VIP模式", "啟用VIP", "vip"}
+VIP主選單指令 = {"VIP主選單", "vip主選單"}
+VIP序號產生指令 = "產生序號"
+超管新增管理員指令 = "新增管理員"
+
+待輸入VIP序號使用者: set[str] = set()  # 等待輸入序號狀態
+超管群組在場狀態: dict[str, bool] = {}  # 記錄超級管理員是否在群組內
 
 
 def _狀態鍵(source_type: str, user_id: str | None, group_id: str | None) -> str:
@@ -226,6 +238,67 @@ def _標準化指令文字(text: str) -> str:
     return normalized  # 回傳正規化後指令
 
 
+def _是超級管理員(user_id: str | None) -> bool:
+    return bool(user_id and user_id == 超級管理員ID)
+
+
+def _是可產生序號管理者(user) -> bool:
+    return bool(user and user.is_admin)
+
+
+def _格式化時間(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def _查詢顯示名稱(source_type: str, group_id: str | None, user_id: str | None) -> str:
+    if not user_id:
+        return "Unknown"
+
+    with ApiClient(configuration) as api_client:
+        messaging_api = MessagingApi(api_client)
+        try:
+            if source_type == "group" and group_id:
+                profile = messaging_api.get_group_member_profile(group_id=group_id, user_id=user_id)
+                name = getattr(profile, "display_name", None)
+                if isinstance(name, str) and name.strip():
+                    return name.strip()
+            profile = messaging_api.get_profile(user_id=user_id)
+            name = getattr(profile, "display_name", None)
+            if isinstance(name, str) and name.strip():
+                return name.strip()
+        except Exception:
+            return "Unknown"
+    return "Unknown"
+
+
+def _抽取被提及用戶ID(message) -> str | None:
+    mention = getattr(message, "mention", None)
+    mentionees = getattr(mention, "mentionees", None)
+    if mentionees:
+        for mentionee in mentionees:
+            user_id = getattr(mentionee, "user_id", None) or getattr(mentionee, "userId", None)
+            if isinstance(user_id, str) and user_id.strip():
+                return user_id.strip()
+    return None
+
+
+def _解析產生序號天數(command_text: str) -> tuple[int, str | None]:
+    parts = command_text.split()
+    if len(parts) <= 1:
+        return 0, None
+    try:
+        extra_days = int(parts[1])
+    except ValueError:
+        return 0, "天數請輸入整數，例如：/產生序號 15"
+    if extra_days < 0:
+        return 0, "額外天數不可小於 0"
+    return extra_days, None
+
+
+def _vip是否啟用(vip_status) -> bool:
+    return bool(vip_status and bool(vip_status.get("is_active", False)))
+
+
 def _建立說明文字(source_type: str, is_group_manager: bool) -> str:
     lines = [
         "翻翻君指令說明：",
@@ -238,20 +311,24 @@ def _建立說明文字(source_type: str, is_group_manager: bool) -> str:
         "4. 指令說明 / 使用說明 / 幫助",
         "   顯示這份說明。",
         "5. 預設翻譯通道：DeepL（失敗時自動備援）。",
+        "6. 開通VIP模式",
+        "   輸入序號啟用 VIP，預設 30 天。",
+        "7. VIP主選單",
+        "   查看開通時間、當前方案、剩餘字數。",
     ]  # 基礎說明
 
     if source_type == "group":
         lines.extend(
             [
-                "6. 綁定邀請者",
+                "8. 綁定邀請者",
                 "   由群組第一位綁定者成為邀請者代表。",
-                "7. 設定語言 中文、泰文",
+                "9. 設定語言 中文、泰文",
                 "   群組可複選語言，之後每句都會翻譯成多語。",
-                "8. 重設翻譯設定",
+                "10. 重設翻譯設定",
                 "   把群組翻譯語言重設成中文。",
-                "9. 查看群組設定",
+                "11. 查看群組設定",
                 "   查看本群翻譯語言與邀請者代表。",
-                "10. 重設邀請者",
+                "12. 重設邀請者",
                 "   把邀請者代表改成目前發送指令的人。",
             ]
         )  # 群組指令
@@ -331,11 +408,12 @@ def handle_follow(event: FollowEvent) -> None:
             update_user_language(db, user, language_code)  # 寫入語言模式
             profile = _設定使用者智慧配置(user_id, language_code, True)  # 寫入地區配置
             message = _建立智慧配置歡迎訊息(user.member_code, profile)
+            vip_enabled = _vip是否啟用(get_vip_status(db, user_id))
             _reply_messages(
                 reply_token,
                 [
                     TextMessage(text=message, quickReply=None, quoteToken=None),
-                    build_main_menu_card(source_type="user", is_group_manager=False, current_language_code=language_code),
+                    build_main_menu_card(source_type="user", is_group_manager=False, current_language_code=language_code, vip_enabled=vip_enabled),
                 ],
             )  # 有 LINE language 時直接發歡迎訊息
             return
@@ -391,12 +469,20 @@ def handle_text_message(event: MessageEvent) -> None:
     source_type = getattr(event.source, "type", "")  # 來源型別
     user_id = getattr(event.source, "user_id", None)  # 來源使用者
     group_id = getattr(event.source, "group_id", None) if source_type == "group" else None  # 來源群組
+    state_key = _狀態鍵(source_type, user_id, group_id)
 
     with SessionLocal() as db:
         user = get_user_by_line_id(db, user_id) if user_id else None  # 查詢使用者資料
         if user_id and not user:
             member_code = generate_member_code(db)  # 產生新編號
             user = create_user(db, user_id, member_code, DEFAULT_LANGUAGE_CODE)  # 自動補建使用者
+
+        vip_status = get_vip_status(db, user_id) if user_id else None
+        vip_enabled = _vip是否啟用(vip_status)
+
+        if source_type == "group" and group_id and _是超級管理員(user_id):
+            超管群組在場狀態[group_id] = True
+            即時翻譯狀態[state_key] = False  # 超級管理員在群組內時強制關閉翻譯
 
         if source_type == "user" and user_id and user:
             profile = _取得使用者智慧配置(user_id)
@@ -409,13 +495,123 @@ def handle_text_message(event: MessageEvent) -> None:
                     reply_token,
                     [
                         TextMessage(text=message, quickReply=None, quoteToken=None),
-                        build_main_menu_card(source_type="user", is_group_manager=False, current_language_code=detected_code),
+                        build_main_menu_card(source_type="user", is_group_manager=False, current_language_code=detected_code, vip_enabled=vip_enabled),
                     ],
                 )  # 產生歡迎訊息
                 return
 
         current_group = get_group(db, group_id) if group_id else None  # 先讀取群組資料供說明與權限判斷使用
         is_group_manager = bool(current_group and can_manage_group(current_group, user, user_id))  # 是否具備群組管理權限
+
+        if text.startswith(超管新增管理員指令):
+            if not _是超級管理員(user_id):
+                _reply_text(reply_token, "此指令僅限超級管理員使用。")
+                return
+
+            target_user_id = _抽取被提及用戶ID(event.message)
+            if not target_user_id:
+                words = text.split()
+                for word in words:
+                    if word.startswith("U") and len(word) >= 20:
+                        target_user_id = word
+                        break
+
+            if not target_user_id:
+                _reply_text(reply_token, "請使用：新增管理員 @用戶")
+                return
+
+            target_user = get_user_by_line_id(db, target_user_id)
+            if not target_user:
+                target_code = generate_member_code(db)
+                target_user = create_user(db, target_user_id, target_code, DEFAULT_LANGUAGE_CODE)
+            updated_user = update_user_admin_flag(db, target_user, True)
+            _reply_text(reply_token, f"✅ 已新增管理員\n會員：{updated_user.member_code}\nUser ID：{updated_user.line_user_id}")
+            return
+
+        if text.startswith(VIP序號產生指令):
+            if not (_是超級管理員(user_id) or _是可產生序號管理者(user)):
+                _reply_text(reply_token, "此指令僅限管理員使用。")
+                return
+
+            extra_days, parse_error = _解析產生序號天數(text)
+            if parse_error:
+                _reply_text(reply_token, parse_error)
+                return
+
+            creator_name = _查詢顯示名稱(source_type, group_id, user_id)
+            creator_code = user.member_code if user else None
+            serial = generate_unique_vip_serial(
+                db=db,
+                created_by_user_id=user_id or "",
+                created_by_name=creator_name,
+                created_by_member_code=creator_code,
+                extra_days=extra_days,
+            )
+            _reply_text(
+                reply_token,
+                "✅ 已產生 VIP 序號\n"
+                f"管理員名稱：{serial.created_by_name}\n"
+                f"序號號碼：{serial.serial_code}\n"
+                f"可用天數：{serial.total_days} 天（預設 30 + 追加 {serial.extra_days}）\n"
+                "狀態：未使用",
+            )
+            return
+
+        if text_for_command in VIP啟用指令:
+            if not user_id:
+                _reply_text(reply_token, "無法識別會員，請稍後再試。")
+                return
+            待輸入VIP序號使用者.add(user_id)
+            _reply_text(reply_token, "請輸入 VIP 序號（16 碼，開頭 FANVIP）。")
+            return
+
+        if text_for_command in VIP主選單指令:
+            if not vip_enabled or not vip_status:
+                _reply_text(reply_token, "你目前尚未啟用 VIP，請先點選『開通VIP模式』並輸入序號。")
+                return
+            _reply_messages(
+                reply_token,
+                [
+                    build_vip_main_menu_card(
+                        started_at_text=_格式化時間(vip_status["started_at"]),
+                        current_plan=str(vip_status["current_plan"]),
+                        remaining_chars=int(vip_status["remaining_chars"]),
+                    )
+                ],
+            )
+            return
+
+        if user_id and user_id in 待輸入VIP序號使用者:
+            if text in {"取消", "cancel", "取消開通"}:
+                待輸入VIP序號使用者.discard(user_id)
+                _reply_text(reply_token, "已取消 VIP 開通流程。")
+                return
+
+            subscription, message = activate_vip_by_serial(db, user_id, user.member_code if user else "", text)
+            if not subscription:
+                _reply_text(reply_token, f"❌ 開通失敗：{message}")
+                return
+
+            待輸入VIP序號使用者.discard(user_id)
+            _reply_messages(
+                reply_token,
+                [
+                    TextMessage(
+                        text=(
+                            "開通完成 感謝成為翻翻君VIP會員\n"
+                            f"剩餘字數：{subscription.remaining_chars}"
+                        ),
+                        quickReply=None,
+                        quoteToken=None,
+                    ),
+                    build_vip_main_menu_card(
+                        started_at_text=_格式化時間(subscription.started_at),
+                        current_plan=subscription.current_plan,
+                        remaining_chars=subscription.remaining_chars,
+                    ),
+                ],
+            )
+            return
 
         if text_for_command in 語言選單指令:
             selected_codes = get_group_languages(db, group_id) if group_id else [user.target_language] if user else [DEFAULT_LANGUAGE_CODE]  # 取得目前勾選語言
@@ -445,6 +641,7 @@ def handle_text_message(event: MessageEvent) -> None:
                         current_language_code=selected_codes[0] if selected_codes else DEFAULT_LANGUAGE_CODE,
                         translation_enabled=translation_enabled,
                         auto_detect_enabled=auto_detect_enabled,
+                        vip_enabled=vip_enabled,
                     ),
                 ],
             )  # 顯示主選單小卡
@@ -501,6 +698,7 @@ def handle_text_message(event: MessageEvent) -> None:
                         current_language_code=selected_codes[0] if selected_codes else DEFAULT_LANGUAGE_CODE,
                         translation_enabled=translation_enabled,
                         auto_detect_enabled=auto_detect_enabled,
+                        vip_enabled=vip_enabled,
                     ),
                 ],
             )
@@ -527,12 +725,11 @@ def handle_text_message(event: MessageEvent) -> None:
                         current_language_code=selected_codes[0] if selected_codes else DEFAULT_LANGUAGE_CODE,
                         translation_enabled=translation_enabled,
                         auto_detect_enabled=auto_detect_enabled,
+                        vip_enabled=vip_enabled,
                     ),
                 ],
             )  # 顯示指令說明與主選單小卡
             return
-
-        state_key = _狀態鍵(source_type, user_id, group_id)
 
         if text_for_command in 即時翻譯啟用指令:
             即時翻譯狀態[state_key] = True
@@ -694,6 +891,10 @@ def handle_text_message(event: MessageEvent) -> None:
             default_auto_detect=(source_type != "group"),
         )
 
+        if source_type == "group" and group_id and 超管群組在場狀態.get(group_id, False):
+            _reply_text(reply_token, "超級管理員在群組內 翻譯系統自動關閉")
+            return
+
         if not translation_enabled:
             _reply_text(reply_token, "⛔ 目前即時翻譯功能為關閉中\n可點選主選單中的開啟按鈕恢復翻譯。")
             return
@@ -718,6 +919,42 @@ def handle_text_message(event: MessageEvent) -> None:
 
         translated = translate_text(text, target_code)  # 執行翻譯
         _reply_text(reply_token, f"翻譯結果：\n{translated}")  # 回覆翻譯結果
+
+
+@line_handler.add(MemberJoinedEvent)
+def handle_member_joined(event: MemberJoinedEvent) -> None:
+    reply_token = event.reply_token
+    group_id = getattr(event.source, "group_id", None)
+    if not reply_token or not group_id:
+        return
+
+    joined = getattr(event, "joined", None)
+    members = getattr(joined, "members", []) if joined else []
+    for member in members:
+        member_id = getattr(member, "user_id", None)
+        if member_id == 超級管理員ID:
+            超管群組在場狀態[group_id] = True
+            即時翻譯狀態[_狀態鍵("group", None, group_id)] = False
+            _reply_text(reply_token, "超級管理員在群組內 翻譯系統自動關閉")
+            return
+
+
+@line_handler.add(MemberLeftEvent)
+def handle_member_left(event: MemberLeftEvent) -> None:
+    reply_token = event.reply_token
+    group_id = getattr(event.source, "group_id", None)
+    if not reply_token or not group_id:
+        return
+
+    left = getattr(event, "left", None)
+    members = getattr(left, "members", []) if left else []
+    for member in members:
+        member_id = getattr(member, "user_id", None)
+        if member_id == 超級管理員ID:
+            超管群組在場狀態[group_id] = False
+            即時翻譯狀態[_狀態鍵("group", None, group_id)] = True
+            _reply_text(reply_token, "超級管理員在群組內 翻譯系統自動開啟")
+            return
 
 
 def verify_signature(body: str, signature: str) -> None:
@@ -747,6 +984,7 @@ def handle_location_message(event: MessageEvent) -> None:
         user = get_user_by_line_id(db, user_id) if user_id else None
         current_language_code = _current_language_code(source_type, user, group_id, db)
         travel_i18n = get_travel_i18n(current_language_code)
+        vip_enabled = _vip是否啟用(get_vip_status(db, user_id) if user_id else None)
 
         if not user_id:
             _reply_text(reply_token, travel_i18n["not_enabled_yet"])
@@ -775,6 +1013,7 @@ def handle_location_message(event: MessageEvent) -> None:
                     current_language_code=current_language_code,
                     translation_enabled=True,
                     auto_detect_enabled=自動偵測狀態.get(_狀態鍵(source_type, user_id, group_id), source_type != "group"),
+                    vip_enabled=vip_enabled,
                 ),
             ],
         )
