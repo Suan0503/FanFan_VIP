@@ -1,8 +1,9 @@
 from datetime import datetime
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.db.models import VIPSerialCode, VIPSubscription
+from app.db.models import VIPSerialCode, VIPSubscription, VIPUsageLog
 
 
 def get_vip_subscription(db: Session, line_user_id: str) -> VIPSubscription | None:
@@ -90,3 +91,49 @@ def mark_vip_serial_used(
     db.commit()
     db.refresh(serial)
     return serial
+
+
+def consume_vip_quota(db: Session, line_user_id: str, amount: int) -> VIPSubscription | None:
+    if amount <= 0:
+        return get_vip_subscription(db, line_user_id)
+
+    row = get_vip_subscription(db, line_user_id)
+    if not row:
+        return None
+
+    row.remaining_chars = max(0, row.remaining_chars - amount)
+    row.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def add_vip_usage_log(
+    db: Session,
+    line_user_id: str,
+    source_type: str,
+    source_id: str,
+    consumed_chars: int,
+) -> VIPUsageLog:
+    row = VIPUsageLog(
+        line_user_id=line_user_id,
+        source_type=source_type,
+        source_id=source_id,
+        consumed_chars=max(consumed_chars, 0),
+        created_at=datetime.utcnow(),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def get_today_vip_consumed_chars(db: Session, line_user_id: str, day_start: datetime, day_end: datetime) -> int:
+    value = (
+        db.query(func.coalesce(func.sum(VIPUsageLog.consumed_chars), 0))
+        .filter(VIPUsageLog.line_user_id == line_user_id)
+        .filter(VIPUsageLog.created_at >= day_start)
+        .filter(VIPUsageLog.created_at < day_end)
+        .scalar()
+    )
+    return int(value or 0)

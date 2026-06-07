@@ -280,6 +280,10 @@ def build_main_menu_card(
     translation_enabled: bool = True,
     auto_detect_enabled: bool = False,
     vip_enabled: bool = False,
+    vip_started_at_text: str = "-",
+    vip_plan: str = "VIP-DEEPL-PRO-100K",
+    vip_remaining_chars: int = 0,
+    show_vip_actions: bool = False,
 ) -> FlexMessage:
     is_group_mode = source_type == "group"
     i18n = get_menu_i18n(current_language_code)
@@ -287,6 +291,14 @@ def build_main_menu_card(
     mode_name = i18n["mode_group"] if is_group_mode else i18n["mode_personal"]
     mode_banner_color = THEME_GROUP if is_group_mode else THEME_PERSONAL_LIGHT
     mode_button_color = THEME_GROUP if is_group_mode else THEME_PERSONAL
+    header_title = "翻翻君 - V1.0正式版"
+    version_text = i18n["version"]
+
+    if vip_enabled:
+        mode_banner_color = "#121212"
+        mode_button_color = "#2A1E0B"
+        header_title = "翻翻君 - VIP尊榮版"
+        version_text = "當前版本 - V1.0.0 VIP版"
 
     group_tip = i18n["group_tip_group"]
     group_action = "查看群組設定"
@@ -312,6 +324,40 @@ def build_main_menu_card(
         )
     )
 
+    footer_actions: list[FlexButton] = [
+        _build_feature_button(
+            i18n["btn_help"],
+            "指令說明",
+            mode_button_color,
+        ),
+        _build_feature_button(
+            i18n["btn_vip"],
+            vip_command,
+            mode_button_color,
+        ),
+    ]
+
+    if vip_enabled and show_vip_actions:
+        footer_actions.extend(
+            [
+                _build_feature_button(
+                    "高級功能1：查看群組",
+                    "查看群組",
+                    mode_button_color,
+                ),
+                _build_feature_button(
+                    "高級功能2：查看當日消耗額度",
+                    "查看當日消耗額度",
+                    mode_button_color,
+                ),
+                _build_feature_button(
+                    "高級功能3：離開群組",
+                    "離開群組",
+                    mode_button_color,
+                ),
+            ]
+        )
+
     bubble = FlexBubble(
         size="giga",
         header=FlexBox(
@@ -320,7 +366,7 @@ def build_main_menu_card(
             backgroundColor=mode_banner_color,
             contents=[
                 FlexText(
-                    text="翻翻君 - V1.0正式版",
+                    text=header_title,
                     size="sm",
                     color=THEME_GOLD,
                     weight="bold",
@@ -353,10 +399,31 @@ def build_main_menu_card(
                     i18n["status_off"],
                 ),
                 FlexText(
-                    text=i18n["version"],
+                    text=version_text,
                     size="xs",
                     color=THEME_WHITE,
                     margin="md",
+                ),
+                FlexText(
+                    text=f"開通時間 - {vip_started_at_text}" if vip_enabled else "",
+                    size="xs",
+                    color="#E7D3A1",
+                    margin="sm",
+                    wrap=True,
+                ),
+                FlexText(
+                    text=f"當前方案 - {vip_plan}" if vip_enabled else "",
+                    size="xs",
+                    color="#E7D3A1",
+                    margin="sm",
+                    wrap=True,
+                ),
+                FlexText(
+                    text=f"剩餘字數 - {vip_remaining_chars}" if vip_enabled else "",
+                    size="xs",
+                    color="#E7D3A1",
+                    margin="sm",
+                    wrap=True,
                 ),
             ],
         ),
@@ -420,16 +487,7 @@ def build_main_menu_card(
                     wrap=True,
                     margin="xs",
                 ),
-                _build_feature_button(
-                    i18n["btn_help"],
-                    "指令說明",
-                    mode_button_color,
-                ),
-                _build_feature_button(
-                    i18n["btn_vip"],
-                    vip_command,
-                    mode_button_color,
-                ),
+                *footer_actions,
             ],
         ),
     )

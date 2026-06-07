@@ -23,6 +23,8 @@ class GroupSetting(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)  # 主鍵
     line_group_id: Mapped[str] = mapped_column(String(64), nullable=False)  # 群組 ID
+    group_name: Mapped[str | None] = mapped_column(String(255), nullable=True)  # 群組名稱快取
+    group_name_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # 群組名稱最後同步時間
     inviter_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)  # 邀請者代表 ID
     target_language: Mapped[str] = mapped_column(String(16), nullable=False, default="zh-TW")  # 群組語言
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 建立時間
@@ -72,7 +74,18 @@ class VIPSubscription(Base):
     member_code: Mapped[str] = mapped_column(String(16), nullable=False)  # 會員編號
     started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)  # 本次方案起始時間
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)  # 方案到期時間
-    current_plan: Mapped[str] = mapped_column(String(64), nullable=False, default="VIP-30D")  # 目前方案
+    current_plan: Mapped[str] = mapped_column(String(64), nullable=False, default="VIP-DEEPL-PRO-100K")  # 目前方案
     remaining_chars: Mapped[int] = mapped_column(nullable=False, default=100000)  # 剩餘字數
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 建立時間
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 更新時間
+
+
+class VIPUsageLog(Base):
+    __tablename__ = "vip_usage_logs"  # VIP 使用量紀錄表
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)  # 主鍵
+    line_user_id: Mapped[str] = mapped_column(String(64), nullable=False)  # 額度擁有者 LINE ID
+    source_type: Mapped[str] = mapped_column(String(16), nullable=False)  # 來源類型 user/group
+    source_id: Mapped[str] = mapped_column(String(64), nullable=False)  # 來源 ID
+    consumed_chars: Mapped[int] = mapped_column(nullable=False, default=0)  # 消耗字數
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 建立時間
