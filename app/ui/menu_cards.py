@@ -12,7 +12,6 @@
 from app.core.languages import SUPPORTED_LANGUAGES
 from app.ui.menu_registry import get_menu_i18n
 from app.ui.menu_schema import MenuI18n
-from app.ui.travel_i18n import get_travel_i18n
 
 
 BRAND_NAME = "FanFan VIP"
@@ -287,7 +286,6 @@ def build_main_menu_card(
     mode_name = i18n["mode_group"] if is_group_mode else i18n["mode_personal"]
     mode_banner_color = THEME_GROUP if is_group_mode else THEME_PERSONAL_LIGHT
     mode_button_color = THEME_GROUP if is_group_mode else THEME_PERSONAL
-    travel_i18n = get_travel_i18n(current_language_code)
 
     group_tip = i18n["group_tip_group"]
     group_action = "查看群組設定"
@@ -423,11 +421,6 @@ def build_main_menu_card(
                 _build_feature_button(
                     i18n["btn_help"],
                     "指令說明",
-                    mode_button_color,
-                ),
-                _build_feature_button(
-                    travel_i18n["menu_button"],
-                    travel_i18n["entry_command"],
                     mode_button_color,
                 ),
                 _build_feature_button(

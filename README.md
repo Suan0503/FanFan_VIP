@@ -5,7 +5,7 @@
 ## 功能
 
 1. 中文介面語言選單（中文、英文、泰文、越南文、緬甸文、韓文、印尼文、日文、俄文）
-2. 好友加入自動綁定個人編號（格式：`FAN000001`）
+2. 好友加入自動綁定個人編號（格式：`FAN001`）
 3. 群組設定權限控管：僅群組邀請者（以首次綁定者認定）與程式所有者/管理員可設定
 
 ## LINE 指令（含斜線快捷）
@@ -100,9 +100,9 @@ uvicorn app.main:app --reload
 
 ```bash
 python tools/admin_manager.py 升級管理員 --使用者ID Uxxxxxxxx --自動建立
-python tools/admin_manager.py 升級管理員 --編號 FAN000001
-python tools/admin_manager.py 取消管理員 --編號 FAN000001
-python tools/admin_manager.py 查詢使用者 --編號 FAN000001
+python tools/admin_manager.py 升級管理員 --編號 FAN001
+python tools/admin_manager.py 取消管理員 --編號 FAN001
+python tools/admin_manager.py 查詢使用者 --編號 FAN001
 python tools/admin_manager.py 列出管理員
 ```
 
