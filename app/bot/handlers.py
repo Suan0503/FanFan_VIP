@@ -36,7 +36,7 @@ from app.services.travel_assistant_service import build_travel_progress_text, bu
 from app.services.travel_context import consume_awaiting_location, get_last_location, mark_awaiting_location, set_last_location
 from app.services.translation_service import translate_text, translate_text_vip_pro  # 匯入翻譯服務
 from app.services.permission_service import can_manage_group  # 匯入權限服務
-from app.ui.menu_cards import build_language_setting_card, build_main_menu_card, build_vip_main_menu_card  # 匯入新版 Flex 小卡
+from app.ui.menu_cards import build_admin_menu_card, build_language_setting_card, build_main_menu_card, build_tutorial_center_card, build_vip_feature_menu_card  # 匯入新版 Flex 小卡
 from app.ui.travel_cards import build_travel_mode_card
 from app.ui.travel_i18n import get_travel_back_commands, get_travel_confirm_commands, get_travel_entry_commands, get_travel_i18n
 from app.ui.welcome_i18n import get_welcome_i18n
@@ -53,6 +53,7 @@ line_handler = WebhookHandler(settings.line_channel_secret)  # 建立 webhook ha
 綁定邀請者指令 = "綁定邀請者"  # 綁定邀請者代表指令
 管理員白名單指令 = {"查看群組設定", "重設邀請者"}  # 僅管理者可用的群組指令
 說明指令 = {"指令說明", "使用說明", "幫助"}  # 顯示說明指令
+教學中心指令 = {"教學中心"}
 重設翻譯指令 = {"重設翻譯設定", "重設語言"}  # 重設群組翻譯語言
 自動偵測啟用指令 = {"啟用自動偵測", "自動偵測"}  # 啟用非中文轉中文
 自動偵測關閉指令 = {"關閉自動偵測"}  # 關閉自動偵測
@@ -95,8 +96,11 @@ line_handler = WebhookHandler(settings.line_channel_secret)  # 建立 webhook ha
 
 VIP啟用指令 = {"vip開通", "啟用VIP", "vip"}
 VIP主選單指令 = {"VIP主選單", "vip主選單"}
+VIP功能選單指令 = {"VIP功能選單", "vip功能選單"}
 VIP序號產生指令 = "產生序號"
 超管新增管理員指令 = "新增管理員"
+管理員選單指令 = {"管理員選單"}
+管理員指令說明指令 = {"管理員指令"}
 VIP查看群組指令 = {"查看群組"}
 VIP查看當日消耗指令 = {"查看當日消耗額度"}
 VIP離開群組指令 = {"離開群組"}
@@ -250,6 +254,10 @@ def _是超級管理員(user_id: str | None) -> bool:
 
 def _是可產生序號管理者(user) -> bool:
     return bool(user and user.is_admin)
+
+
+def _是管理員(user_id: str | None, user) -> bool:
+    return _是超級管理員(user_id) or _是可產生序號管理者(user)
 
 
 def _格式化時間(dt: datetime) -> str:
@@ -619,16 +627,69 @@ def handle_text_message(event: MessageEvent) -> None:
             if not vip_enabled or not vip_status:
                 _reply_text(reply_token, "你目前尚未啟用 VIP，請先點選『vip開通』並輸入序號。")
                 return
+            today_used = get_today_consumed_chars(db, str(vip_status.get("owner_user_id", user_id or "")))
             _reply_messages(
                 reply_token,
                 [
-                    build_vip_main_menu_card(
+                    build_vip_feature_menu_card(
                         started_at_text=_格式化時間(vip_status["started_at"]),
                         current_plan=str(vip_status["current_plan"]),
                         remaining_chars=int(vip_status["remaining_chars"]),
+                        today_used_chars=today_used,
                     )
                 ],
             )
+            return
+
+        if text_for_command in VIP功能選單指令:
+            if not vip_enabled or not vip_status:
+                _reply_text(reply_token, "你目前尚未啟用 VIP，請先點選『vip開通』並輸入序號。")
+                return
+            today_used = get_today_consumed_chars(db, str(vip_status.get("owner_user_id", user_id or "")))
+            _reply_messages(
+                reply_token,
+                [
+                    build_vip_feature_menu_card(
+                        started_at_text=_格式化時間(vip_status["started_at"]),
+                        current_plan=str(vip_status["current_plan"]),
+                        remaining_chars=int(vip_status["remaining_chars"]),
+                        today_used_chars=today_used,
+                    )
+                ],
+            )
+            return
+
+        if text_for_command in 教學中心指令:
+            current_language_code = _current_language_code(source_type, user, group_id, db)
+            _reply_messages(reply_token, [build_tutorial_center_card(current_language_code)])
+            return
+
+        if text_for_command in 管理員選單指令:
+            if not _是管理員(user_id, user):
+                _reply_text(reply_token, "此功能僅限超級管理員與全域管理員使用。")
+                return
+            _reply_messages(reply_token, [build_admin_menu_card(_是超級管理員(user_id))])
+            return
+
+        if text_for_command in 管理員指令說明指令:
+            if not _是管理員(user_id, user):
+                _reply_text(reply_token, "此功能僅限超級管理員與全域管理員使用。")
+                return
+            lines = [
+                "管理員指令：",
+                "1. 產生序號",
+                "   產生 16 碼 FANVIP 序號。",
+                "2. 查看群組設定",
+                "   查看目前群組翻譯語言與邀請者。",
+                "3. 重設邀請者",
+                "   把目前群組邀請者代表改成自己。",
+            ]
+            if _是超級管理員(user_id):
+                lines.extend([
+                    "4. 新增管理員 @用戶",
+                    "   將指定用戶提升為全域管理員。",
+                ])
+            _reply_text(reply_token, "\n".join(lines))
             return
 
         if source_type == "user" and text_for_command in VIP查看群組指令:
@@ -643,7 +704,7 @@ def handle_text_message(event: MessageEvent) -> None:
             lines = ["你綁定的群組列表："]
             for idx, group in enumerate(groups, start=1):
                 group_name = group.group_name or "(未命名群組)"
-                lines.append(f"{idx}. {group_name}｜{group.line_group_id}")
+                lines.append(f"{idx}. {group_name}")
             _reply_text(reply_token, "\n".join(lines))
             return
 
@@ -670,7 +731,7 @@ def handle_text_message(event: MessageEvent) -> None:
             lines = ["請輸入群組編號，讓機器人退出："]
             for idx, group in enumerate(groups, start=1):
                 group_name = group.group_name or "(未命名群組)"
-                lines.append(f"{idx}. {group_name}｜{group.line_group_id}")
+                lines.append(f"{idx}. {group_name}")
             _reply_text(reply_token, "\n".join(lines))
             return
 
@@ -681,15 +742,17 @@ def handle_text_message(event: MessageEvent) -> None:
                 _reply_text(reply_token, "編號超出範圍，請重新輸入。")
                 return
             target_group_id = options[choice - 1]
+            groups = list_groups_by_inviter(db, user_id)
+            target_group_name = groups[choice - 1].group_name if choice - 1 < len(groups) else target_group_id
             with ApiClient(configuration) as api_client:
                 messaging_api = MessagingApi(api_client)
                 try:
                     messaging_api.leave_group(group_id=target_group_id)
                 except Exception:
-                    _reply_text(reply_token, f"離開群組失敗：{target_group_id}")
+                    _reply_text(reply_token, f"離開群組失敗：{target_group_name or '未命名群組'}")
                     return
             待離開群組選擇.pop(user_id, None)
-            _reply_text(reply_token, f"已退出群組：{target_group_id}")
+            _reply_text(reply_token, f"已退出群組：{target_group_name or '未命名群組'}")
             return
 
         if source_type == "user" and user_id and user_id in 待離開群組選擇:
@@ -712,6 +775,7 @@ def handle_text_message(event: MessageEvent) -> None:
                 return
 
             待輸入VIP序號使用者.discard(user_id)
+            today_used = get_today_consumed_chars(db, user_id)
             _reply_messages(
                 reply_token,
                 [
@@ -723,10 +787,11 @@ def handle_text_message(event: MessageEvent) -> None:
                         quickReply=None,
                         quoteToken=None,
                     ),
-                    build_vip_main_menu_card(
+                    build_vip_feature_menu_card(
                         started_at_text=_格式化時間(subscription.started_at),
                         current_plan=subscription.current_plan,
                         remaining_chars=subscription.remaining_chars,
+                        today_used_chars=today_used,
                     ),
                 ],
             )
