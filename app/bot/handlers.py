@@ -101,6 +101,8 @@ VIP序號產生指令 = "產生序號"
 超管新增管理員指令 = "新增管理員"
 管理員選單指令 = {"管理員選單"}
 管理員指令說明指令 = {"管理員指令"}
+超管翻譯鎖定開啟指令 = {"超管翻譯鎖定開啟"}
+超管翻譯鎖定關閉指令 = {"超管翻譯鎖定關閉"}
 VIP查看群組指令 = {"查看群組"}
 VIP查看當日消耗指令 = {"查看當日消耗額度"}
 VIP離開群組指令 = {"離開群組"}
@@ -108,6 +110,7 @@ VIP離開群組指令 = {"離開群組"}
 待輸入VIP序號使用者: set[str] = set()  # 等待輸入序號狀態
 待離開群組選擇: dict[str, list[str]] = {}  # 使用者待選擇離開群組列表
 超管群組在場狀態: dict[str, bool] = {}  # 記錄超級管理員是否在群組內
+超管翻譯鎖定狀態: dict[str, bool] = {}  # 記錄群組是否啟用超管翻譯鎖定（預設啟用）
 
 
 def _狀態鍵(source_type: str, user_id: str | None, group_id: str | None) -> str:
@@ -300,6 +303,19 @@ def _vip是否啟用(vip_status) -> bool:
     return bool(vip_status and bool(vip_status.get("is_active", False)))
 
 
+def _標準化vip方案(plan_name: str | None) -> str:
+    value = (plan_name or "").strip().upper()
+    if not value:
+        return "VIP-AZURE-100K"
+    if "DEEPL" in value:
+        return "VIP-AZURE-100K"
+    return plan_name or "VIP-AZURE-100K"
+
+
+def _超管翻譯鎖定中(group_id: str) -> bool:
+    return 超管翻譯鎖定狀態.get(group_id, True)
+
+
 def _vip選單參數(vip_status: dict | None) -> dict:
     if not _vip是否啟用(vip_status):
         return {
@@ -312,7 +328,7 @@ def _vip選單參數(vip_status: dict | None) -> dict:
     return {
         "vip_enabled": True,
         "vip_started_at_text": _格式化時間(vip_status["started_at"]),
-        "vip_plan": str(vip_status.get("current_plan", "VIP-AZURE-100K")),
+        "vip_plan": _標準化vip方案(str(vip_status.get("current_plan", "VIP-AZURE-100K"))),
         "vip_remaining_chars": int(vip_status.get("remaining_chars", 0)),
     }
 
@@ -528,7 +544,10 @@ def handle_text_message(event: MessageEvent) -> None:
 
         if source_type == "group" and group_id and _是超級管理員(user_id):
             超管群組在場狀態[group_id] = True
-            即時翻譯狀態[state_key] = False  # 超級管理員在群組內時強制關閉翻譯
+            if group_id not in 超管翻譯鎖定狀態:
+                超管翻譯鎖定狀態[group_id] = True  # 超管首次在場時預設啟用鎖定
+            if _超管翻譯鎖定中(group_id):
+                即時翻譯狀態[state_key] = False  # 僅在鎖定啟用時預設關閉翻譯
 
         if source_type == "user" and user_id and user:
             profile = _取得使用者智慧配置(user_id)
@@ -633,7 +652,7 @@ def handle_text_message(event: MessageEvent) -> None:
                 [
                     build_vip_feature_menu_card(
                         started_at_text=_格式化時間(vip_status["started_at"]),
-                        current_plan=str(vip_status["current_plan"]),
+                        current_plan=_標準化vip方案(str(vip_status["current_plan"])),
                         remaining_chars=int(vip_status["remaining_chars"]),
                         today_used_chars=today_used,
                     )
@@ -651,7 +670,7 @@ def handle_text_message(event: MessageEvent) -> None:
                 [
                     build_vip_feature_menu_card(
                         started_at_text=_格式化時間(vip_status["started_at"]),
-                        current_plan=str(vip_status["current_plan"]),
+                        current_plan=_標準化vip方案(str(vip_status["current_plan"])),
                         remaining_chars=int(vip_status["remaining_chars"]),
                         today_used_chars=today_used,
                     )
@@ -668,7 +687,27 @@ def handle_text_message(event: MessageEvent) -> None:
             if not _是管理員(user_id, user):
                 _reply_text(reply_token, "此功能僅限超級管理員與全域管理員使用。")
                 return
-            _reply_messages(reply_token, [build_admin_menu_card(_是超級管理員(user_id))])
+            super_lock_enabled = None
+            if source_type == "group" and group_id and _是超級管理員(user_id):
+                super_lock_enabled = _超管翻譯鎖定中(group_id)
+            _reply_messages(reply_token, [build_admin_menu_card(_是超級管理員(user_id), super_lock_enabled)])
+            return
+
+        if text_for_command in 超管翻譯鎖定開啟指令 or text_for_command in 超管翻譯鎖定關閉指令:
+            if not _是超級管理員(user_id):
+                _reply_text(reply_token, "此功能僅限超級管理員使用。")
+                return
+            if source_type != "group" or not group_id:
+                _reply_text(reply_token, "請在群組中使用此功能。")
+                return
+
+            if text_for_command in 超管翻譯鎖定開啟指令:
+                超管翻譯鎖定狀態[group_id] = True
+                即時翻譯狀態[state_key] = False
+                _reply_text(reply_token, "✅ 已開啟超管翻譯鎖定（超管在場時維持關閉）。")
+            else:
+                超管翻譯鎖定狀態[group_id] = False
+                _reply_text(reply_token, "✅ 已關閉超管翻譯鎖定（現在可手動開啟或關閉即時翻譯）。")
             return
 
         if text_for_command in 管理員指令說明指令:
@@ -688,6 +727,8 @@ def handle_text_message(event: MessageEvent) -> None:
                 lines.extend([
                     "4. 新增管理員 @用戶",
                     "   將指定用戶提升為全域管理員。",
+                    "5. 超管翻譯鎖定開啟 / 超管翻譯鎖定關閉",
+                    "   控制超管在場時是否強制關閉翻譯。",
                 ])
             _reply_text(reply_token, "\n".join(lines))
             return
@@ -789,7 +830,7 @@ def handle_text_message(event: MessageEvent) -> None:
                     ),
                     build_vip_feature_menu_card(
                         started_at_text=_格式化時間(subscription.started_at),
-                        current_plan=subscription.current_plan,
+                        current_plan=_標準化vip方案(subscription.current_plan),
                         remaining_chars=subscription.remaining_chars,
                         today_used_chars=today_used,
                     ),
@@ -1078,7 +1119,7 @@ def handle_text_message(event: MessageEvent) -> None:
             default_auto_detect=(source_type != "group"),
         )
 
-        if source_type == "group" and group_id and 超管群組在場狀態.get(group_id, False):
+        if source_type == "group" and group_id and 超管群組在場狀態.get(group_id, False) and _超管翻譯鎖定中(group_id):
             _reply_text(reply_token, "超級管理員在群組內 翻譯系統自動關閉")
             return
 
@@ -1164,8 +1205,13 @@ def handle_member_joined(event: MemberJoinedEvent) -> None:
         member_id = getattr(member, "user_id", None)
         if member_id == 超級管理員ID:
             超管群組在場狀態[group_id] = True
-            即時翻譯狀態[_狀態鍵("group", None, group_id)] = False
-            _reply_text(reply_token, "超級管理員在群組內 翻譯系統自動關閉")
+            if group_id not in 超管翻譯鎖定狀態:
+                超管翻譯鎖定狀態[group_id] = True
+            if _超管翻譯鎖定中(group_id):
+                即時翻譯狀態[_狀態鍵("group", None, group_id)] = False
+                _reply_text(reply_token, "超級管理員在群組內 翻譯系統自動關閉")
+            else:
+                _reply_text(reply_token, "超級管理員已進入群組（超管翻譯鎖定目前為關閉）。")
             return
 
 
@@ -1183,6 +1229,7 @@ def handle_member_left(event: MemberLeftEvent) -> None:
         if member_id == 超級管理員ID:
             超管群組在場狀態[group_id] = False
             即時翻譯狀態[_狀態鍵("group", None, group_id)] = True
+            超管翻譯鎖定狀態.pop(group_id, None)
             _reply_text(reply_token, "超級管理員在群組內 翻譯系統自動開啟")
             return
 

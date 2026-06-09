@@ -663,7 +663,7 @@ def build_vip_feature_menu_card(
     return FlexMessage(altText="VIP 功能選單", contents=bubble, quickReply=None)
 
 
-def build_admin_menu_card(is_super_admin: bool) -> FlexMessage:
+def build_admin_menu_card(is_super_admin: bool, super_lock_enabled: bool | None = None) -> FlexMessage:
     buttons: list[FlexButton] = [
         _build_feature_button("產生序號", "產生序號", "#8B0000"),
         _build_feature_button("管理員指令", "管理員指令", "#8B0000"),
@@ -672,6 +672,12 @@ def build_admin_menu_card(is_super_admin: bool) -> FlexMessage:
     ]
     if is_super_admin:
         buttons.insert(1, _build_feature_button("新增管理員", "新增管理員", "#8B0000"))
+        if super_lock_enabled is None:
+            buttons.insert(2, _build_feature_button("超管翻譯鎖定（僅群組）", "超管翻譯鎖定開啟", "#8B0000"))
+        elif super_lock_enabled:
+            buttons.insert(2, _build_feature_button("超管翻譯鎖定：開啟中", "超管翻譯鎖定關閉", "#8B0000"))
+        else:
+            buttons.insert(2, _build_feature_button("超管翻譯鎖定：關閉中", "超管翻譯鎖定開啟", "#8B0000"))
 
     bubble = FlexBubble(
         size="giga",
@@ -698,6 +704,7 @@ def build_admin_menu_card(is_super_admin: bool) -> FlexMessage:
             backgroundColor="#2B0A0A",
             contents=[
                 FlexText(text="可用文字指令：產生序號、新增管理員、查看群組設定、重設邀請者", size="xs", color="#F8E7C2", wrap=True),
+                FlexText(text="超管可用：超管翻譯鎖定開啟 / 超管翻譯鎖定關閉（請在群組使用）", size="xs", color="#F8E7C2", wrap=True, margin="sm"),
                 FlexButton(
                     style="secondary",
                     action=MessageAction(label=_safe_action_label("回主選單"), text="/menu"),
