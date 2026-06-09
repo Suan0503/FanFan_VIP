@@ -12,7 +12,6 @@
 from app.core.languages import SUPPORTED_LANGUAGES
 from app.ui.menu_registry import get_menu_i18n
 from app.ui.menu_schema import MenuI18n
-from app.ui.travel_i18n import get_travel_i18n
 
 
 BRAND_NAME = "FanFan VIP"
@@ -280,6 +279,11 @@ def build_main_menu_card(
     current_language_code: str = "zh-TW",
     translation_enabled: bool = True,
     auto_detect_enabled: bool = False,
+    vip_enabled: bool = False,
+    vip_started_at_text: str = "-",
+    vip_plan: str = "VIP-DEEPL-PRO-100K",
+    vip_remaining_chars: int = 0,
+    show_vip_actions: bool = False,
 ) -> FlexMessage:
     is_group_mode = source_type == "group"
     i18n = get_menu_i18n(current_language_code)
@@ -287,11 +291,19 @@ def build_main_menu_card(
     mode_name = i18n["mode_group"] if is_group_mode else i18n["mode_personal"]
     mode_banner_color = THEME_GROUP if is_group_mode else THEME_PERSONAL_LIGHT
     mode_button_color = THEME_GROUP if is_group_mode else THEME_PERSONAL
-    travel_i18n = get_travel_i18n(current_language_code)
+    header_title = "翻翻君 - V1.0正式版"
+    version_text = i18n["version"]
+
+    if vip_enabled:
+        mode_banner_color = "#121212"
+        mode_button_color = "#2A1E0B"
+        header_title = "翻翻君 - VIP尊榮版"
+        version_text = "當前版本 - V1.0.0 VIP版"
 
     group_tip = i18n["group_tip_group"]
     group_action = "查看群組設定"
     group_label = i18n["btn_group_manage"]
+    vip_command = "VIP功能選單" if vip_enabled else "vip開通"
 
     if source_type != "group":
         group_tip = i18n["group_tip_personal"]
@@ -312,6 +324,40 @@ def build_main_menu_card(
         )
     )
 
+    footer_actions: list[FlexButton] = [
+        _build_feature_button(
+            i18n["btn_help"],
+            "教學中心",
+            mode_button_color,
+        ),
+        _build_feature_button(
+            i18n["btn_vip"],
+            vip_command,
+            mode_button_color,
+        ),
+    ]
+
+    if vip_enabled and show_vip_actions:
+        footer_actions.extend(
+            [
+                _build_feature_button(
+                    "高級功能1：查看群組",
+                    "查看群組",
+                    mode_button_color,
+                ),
+                _build_feature_button(
+                    "高級功能2：查看當日消耗額度",
+                    "查看當日消耗額度",
+                    mode_button_color,
+                ),
+                _build_feature_button(
+                    "高級功能3：離開群組",
+                    "離開群組",
+                    mode_button_color,
+                ),
+            ]
+        )
+
     bubble = FlexBubble(
         size="giga",
         header=FlexBox(
@@ -320,7 +366,7 @@ def build_main_menu_card(
             backgroundColor=mode_banner_color,
             contents=[
                 FlexText(
-                    text="翻翻君 - V1.0正式版",
+                    text=header_title,
                     size="sm",
                     color=THEME_GOLD,
                     weight="bold",
@@ -353,10 +399,31 @@ def build_main_menu_card(
                     i18n["status_off"],
                 ),
                 FlexText(
-                    text=i18n["version"],
+                    text=version_text,
                     size="xs",
                     color=THEME_WHITE,
                     margin="md",
+                ),
+                FlexText(
+                    text=f"開通時間 - {vip_started_at_text}" if vip_enabled else "",
+                    size="xs",
+                    color="#E7D3A1",
+                    margin="sm",
+                    wrap=True,
+                ),
+                FlexText(
+                    text=f"當前方案 - {vip_plan}" if vip_enabled else "",
+                    size="xs",
+                    color="#E7D3A1",
+                    margin="sm",
+                    wrap=True,
+                ),
+                FlexText(
+                    text=f"剩餘字數 - {vip_remaining_chars}" if vip_enabled else "",
+                    size="xs",
+                    color="#E7D3A1",
+                    margin="sm",
+                    wrap=True,
                 ),
             ],
         ),
@@ -420,21 +487,7 @@ def build_main_menu_card(
                     wrap=True,
                     margin="xs",
                 ),
-                _build_feature_button(
-                    i18n["btn_help"],
-                    "指令說明",
-                    mode_button_color,
-                ),
-                _build_feature_button(
-                    travel_i18n["menu_button"],
-                    travel_i18n["entry_command"],
-                    mode_button_color,
-                ),
-                _build_feature_button(
-                    i18n["btn_vip"],
-                    "指令說明",
-                    mode_button_color,
-                ),
+                *footer_actions,
             ],
         ),
     )
@@ -444,6 +497,218 @@ def build_main_menu_card(
         contents=bubble,
         quickReply=None,
     )
+
+
+def build_vip_main_menu_card(
+    started_at_text: str,
+    current_plan: str,
+    remaining_chars: int,
+) -> FlexMessage:
+    bubble = FlexBubble(
+        size="giga",
+        header=FlexBox(
+            layout="vertical",
+            paddingAll="18px",
+            backgroundColor="#111111",
+            contents=[
+                FlexText(
+                    text="FanFan VIP",
+                    size="sm",
+                    color="#F0C24B",
+                    weight="bold",
+                ),
+                FlexText(
+                    text="VIP 主選單",
+                    size="xxl",
+                    weight="bold",
+                    color="#FFF8E1",
+                    margin="sm",
+                ),
+                FlexText(
+                    text="暗金尊榮方案",
+                    size="xs",
+                    color="#D6B46C",
+                    margin="md",
+                ),
+            ],
+        ),
+        body=FlexBox(
+            layout="vertical",
+            spacing="md",
+            paddingAll="16px",
+            backgroundColor="#1A1A1A",
+            contents=[
+                FlexText(text=f"開通時間：{started_at_text}", size="sm", color="#FFF8E1", wrap=True),
+                FlexText(text=f"當前方案：{current_plan}", size="sm", color="#FFF8E1", wrap=True),
+                FlexText(text=f"剩餘字數：{remaining_chars}", size="sm", color="#FFF8E1", wrap=True),
+                FlexSeparator(margin="md"),
+                FlexButton(
+                    style="primary",
+                    color="#8B6B2D",
+                    action=MessageAction(label=_safe_action_label("序號開通"), text="vip開通"),
+                    cornerRadius="14px",
+                    height="sm",
+                    margin="md",
+                ),
+                FlexButton(
+                    style="secondary",
+                    action=MessageAction(label=_safe_action_label("回主選單"), text="/menu"),
+                    height="sm",
+                    margin="md",
+                ),
+            ],
+        ),
+    )
+
+    return FlexMessage(
+        altText="FanFan VIP 主選單",
+        contents=bubble,
+        quickReply=None,
+    )
+
+
+def build_tutorial_center_card(current_language_code: str = "zh-TW") -> FlexMessage:
+    i18n = get_menu_i18n(current_language_code)
+    bubble = FlexBubble(
+        size="giga",
+        header=FlexBox(
+            layout="vertical",
+            paddingAll="18px",
+            backgroundColor="#0D1B2A",
+            contents=[
+                FlexText(text="FanFan Guide", size="sm", color="#D4AF37", weight="bold"),
+                FlexText(text="教學中心", size="xxl", color="#F8FAFC", weight="bold", margin="sm"),
+                FlexText(text="快速上手與完整操作教學", size="sm", color="#C7D2FE", margin="md"),
+            ],
+        ),
+        body=FlexBox(
+            layout="vertical",
+            spacing="md",
+            paddingAll="16px",
+            backgroundColor="#132238",
+            contents=[
+                FlexText(text=i18n["tutorial_1"], size="sm", color="#F8FAFC", wrap=True),
+                FlexText(text=i18n["tutorial_2_template"].format(target=i18n["auto_detect_target_name"]), size="sm", color="#F8FAFC", wrap=True),
+                FlexText(text=i18n["tutorial_3"], size="sm", color="#F8FAFC", wrap=True),
+                FlexText(text=i18n["tutorial_4"], size="sm", color="#F8FAFC", wrap=True),
+                FlexSeparator(margin="md"),
+                FlexText(text="補充：VIP 可使用 DeepL Pro 線路、查看群組、當日額度、群組退出控制。", size="sm", color="#D6E4F0", wrap=True),
+            ],
+        ),
+        footer=FlexBox(
+            layout="vertical",
+            paddingAll="12px",
+            backgroundColor="#0D1B2A",
+            contents=[
+                FlexButton(
+                    style="secondary",
+                    action=MessageAction(label=_safe_action_label("回主選單"), text="/menu"),
+                    height="sm",
+                ),
+            ],
+        ),
+    )
+
+    return FlexMessage(altText="教學中心", contents=bubble, quickReply=None)
+
+
+def build_vip_feature_menu_card(
+    started_at_text: str,
+    current_plan: str,
+    remaining_chars: int,
+    today_used_chars: int,
+) -> FlexMessage:
+    bubble = FlexBubble(
+        size="giga",
+        header=FlexBox(
+            layout="vertical",
+            paddingAll="18px",
+            backgroundColor="#111111",
+            contents=[
+                FlexText(text="FanFan VIP", size="sm", color="#F0C24B", weight="bold"),
+                FlexText(text="VIP 功能選單", size="xxl", weight="bold", color="#FFF8E1", margin="sm"),
+                FlexText(text="DeepL Pro｜高級會員專屬", size="xs", color="#D6B46C", margin="md"),
+            ],
+        ),
+        body=FlexBox(
+            layout="vertical",
+            spacing="md",
+            paddingAll="16px",
+            backgroundColor="#1A1A1A",
+            contents=[
+                FlexText(text=f"開通時間：{started_at_text}", size="sm", color="#FFF8E1", wrap=True),
+                FlexText(text=f"當前方案：{current_plan}", size="sm", color="#FFF8E1", wrap=True),
+                FlexText(text=f"剩餘字數：{remaining_chars}", size="sm", color="#FFF8E1", wrap=True),
+                FlexText(text=f"今日消耗：{today_used_chars}", size="sm", color="#FFF8E1", wrap=True),
+                FlexSeparator(margin="md"),
+                _build_feature_button("查看群組", "查看群組", "#8B6B2D"),
+                _build_feature_button("查看當日消耗額度", "查看當日消耗額度", "#8B6B2D"),
+                _build_feature_button("離開群組", "離開群組", "#8B6B2D"),
+            ],
+        ),
+        footer=FlexBox(
+            layout="vertical",
+            paddingAll="12px",
+            backgroundColor="#111111",
+            contents=[
+                FlexButton(
+                    style="secondary",
+                    action=MessageAction(label=_safe_action_label("回主選單"), text="/menu"),
+                    height="sm",
+                ),
+            ],
+        ),
+    )
+
+    return FlexMessage(altText="VIP 功能選單", contents=bubble, quickReply=None)
+
+
+def build_admin_menu_card(is_super_admin: bool) -> FlexMessage:
+    buttons: list[FlexButton] = [
+        _build_feature_button("產生序號", "產生序號", "#8B0000"),
+        _build_feature_button("管理員指令", "管理員指令", "#8B0000"),
+        _build_feature_button("查看群組設定", "查看群組設定", "#8B0000"),
+        _build_feature_button("重設邀請者", "重設邀請者", "#8B0000"),
+    ]
+    if is_super_admin:
+        buttons.insert(1, _build_feature_button("新增管理員", "新增管理員", "#8B0000"))
+
+    bubble = FlexBubble(
+        size="giga",
+        header=FlexBox(
+            layout="vertical",
+            paddingAll="18px",
+            backgroundColor="#2B0A0A",
+            contents=[
+                FlexText(text="Admin Control", size="sm", color="#F0C24B", weight="bold"),
+                FlexText(text="管理員選單", size="xxl", color="#FFF8E1", weight="bold", margin="sm"),
+                FlexText(text="僅限超級管理員與全域管理員", size="xs", color="#F4D6A0", margin="md"),
+            ],
+        ),
+        body=FlexBox(
+            layout="vertical",
+            spacing="sm",
+            paddingAll="16px",
+            backgroundColor="#431414",
+            contents=buttons,
+        ),
+        footer=FlexBox(
+            layout="vertical",
+            paddingAll="12px",
+            backgroundColor="#2B0A0A",
+            contents=[
+                FlexText(text="可用文字指令：產生序號、新增管理員、查看群組設定、重設邀請者", size="xs", color="#F8E7C2", wrap=True),
+                FlexButton(
+                    style="secondary",
+                    action=MessageAction(label=_safe_action_label("回主選單"), text="/menu"),
+                    height="sm",
+                    margin="md",
+                ),
+            ],
+        ),
+    )
+
+    return FlexMessage(altText="管理員選單", contents=bubble, quickReply=None)
 
 
 def build_language_setting_card(

@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session  # 匯入 Session
+from datetime import datetime
 
 from app.db.models import GroupSetting, GroupLanguageSelection  # 匯入群組模型
 from app.core.languages import DEFAULT_LANGUAGE_CODE  # 匯入預設語言
@@ -86,3 +87,20 @@ def remove_group_language(db: Session, line_group_id: str, language_code: str) -
 
 def reset_group_languages(db: Session, line_group_id: str) -> list[str]:
     return set_group_languages(db, line_group_id, [DEFAULT_LANGUAGE_CODE])  # 重設成預設語言
+
+
+def list_groups_by_inviter(db: Session, inviter_user_id: str) -> list[GroupSetting]:
+    return (
+        db.query(GroupSetting)
+        .filter(GroupSetting.inviter_user_id == inviter_user_id)
+        .order_by(GroupSetting.created_at.asc())
+        .all()
+    )  # 查詢指定邀請者綁定的所有群組
+
+
+def update_group_name_cache(db: Session, group: GroupSetting, group_name: str, synced_at: datetime) -> GroupSetting:
+    group.group_name = group_name.strip() if group_name else None  # 更新群組名稱快取
+    group.group_name_synced_at = synced_at  # 更新最後同步時間
+    db.commit()
+    db.refresh(group)
+    return group

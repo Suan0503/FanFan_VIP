@@ -91,6 +91,33 @@ def _translate_with_deepl(text: str, target_language_code: str) -> str | None:
         return None  # DeepL 例外時交給備援
 
 
+def _translate_with_deepl_pro(text: str, target_language_code: str) -> str | None:
+    api_key = settings.deepl_api_key.strip()  # 讀取 DeepL 金鑰
+    deepl_target = DEEPL_LANGUAGE_MAP.get(target_language_code)  # 轉換 DeepL 語言代碼
+    if not api_key or not deepl_target:
+        return None
+
+    try:
+        response = requests.post(
+            "https://api.deepl.com/v2/translate",
+            headers={"Authorization": f"DeepL-Auth-Key {api_key}"},
+            data={
+                "text": text,
+                "target_lang": deepl_target,
+            },
+            timeout=20,
+        )
+        if response.status_code != 200:
+            return None
+        payload = response.json()
+        translations = payload.get("translations", [])
+        if not translations:
+            return None
+        return translations[0].get("text")
+    except Exception:
+        return None
+
+
 def _translate_with_fallback(text: str, target_language_code: str) -> str:
     url = "https://translate.googleapis.com/translate_a/single"  # Google 非官方翻譯端點
     params = {
@@ -138,3 +165,16 @@ def translate_text(text: str, target_language_code: str) -> str:
             continue
 
     return clean_text  # 若翻譯失敗則回傳原文
+
+
+def translate_text_vip_pro(text: str, target_language_code: str) -> str:
+    clean_text = text.strip()  # 清理空白
+    if not clean_text:
+        return ""
+    if _is_non_translatable(clean_text):
+        return clean_text
+
+    pro_result = _translate_with_deepl_pro(clean_text, target_language_code)  # VIP 固定走 DeepL Pro
+    if pro_result:
+        return pro_result
+    return clean_text  # Pro 線路不可用時回原文

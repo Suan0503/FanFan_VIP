@@ -88,16 +88,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     promote_parser = sub.add_parser("升級管理員", aliases=["promote"], help="設定為管理員")  # 升權命令
     promote_parser.add_argument("--使用者ID", "--line-user-id", dest="line_user_id", help="LINE User ID")  # LINE ID 參數
-    promote_parser.add_argument("--編號", "--member-code", dest="member_code", help="FAN 編號，例如 FAN000001")  # FAN 編號參數
+    promote_parser.add_argument("--編號", "--member-code", dest="member_code", help="FAN 編號，例如 FAN001")  # FAN 編號參數
     promote_parser.add_argument("--自動建立", "--auto-create", dest="auto_create", action="store_true", help="若 LINE ID 不存在則自動建立")  # 自動建立
 
     demote_parser = sub.add_parser("取消管理員", aliases=["demote"], help="取消管理員")  # 降權命令
     demote_parser.add_argument("--使用者ID", "--line-user-id", dest="line_user_id", help="LINE User ID")  # LINE ID 參數
-    demote_parser.add_argument("--編號", "--member-code", dest="member_code", help="FAN 編號，例如 FAN000001")  # FAN 編號參數
+    demote_parser.add_argument("--編號", "--member-code", dest="member_code", help="FAN 編號，例如 FAN001")  # FAN 編號參數
 
     show_parser = sub.add_parser("查詢使用者", aliases=["show"], help="查看使用者資料")  # 查詢命令
     show_parser.add_argument("--使用者ID", "--line-user-id", dest="line_user_id", help="LINE User ID")  # LINE ID 參數
-    show_parser.add_argument("--編號", "--member-code", dest="member_code", help="FAN 編號，例如 FAN000001")  # FAN 編號參數
+    show_parser.add_argument("--編號", "--member-code", dest="member_code", help="FAN 編號，例如 FAN001")  # FAN 編號參數
 
     sub.add_parser("列出管理員", aliases=["list-admins"], help="列出所有管理員")  # 列表命令
     return parser  # 回傳 parser
