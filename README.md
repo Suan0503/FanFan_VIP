@@ -57,8 +57,8 @@ uvicorn app.main:app --reload
 
 說明：
 
-- 翻譯預設通道為 `DeepL`（失敗時會自動備援）
-- 可用環境變數 `TRANSLATION_CHANNEL=deepl` 明確指定通道
+- 翻譯預設通道為 `Azure Translator`（失敗時會自動備援）
+- 可用環境變數 `TRANSLATION_CHANNEL=azure` 明確指定通道
 
 ## Railway 部署
 
@@ -67,6 +67,9 @@ uvicorn app.main:app --reload
 3. 設定環境變數：
   - `LINE_CHANNEL_ACCESS_TOKEN`（也相容你目前的 `CHANNEL_ACCESS_TOKEN`）
   - `LINE_CHANNEL_SECRET`（也相容你目前的 `CHANNEL_SECRET`）
+  - `AZURE_TRANSLATOR_ENDPOINT`
+  - `AZURE_TRANSLATOR_KEY`
+  - `AZURE_TRANSLATOR_REGION`
   - `DEEPL_API_KEY`
    - `APP_OWNER_USER_IDS`
   - `DATABASE_URL`（請使用 Railway Postgres 的 `DATABASE_URL` 變數參照）
@@ -76,7 +79,7 @@ uvicorn app.main:app --reload
 
 - Railway 是否已有 `CHANNEL_ACCESS_TOKEN` / `CHANNEL_SECRET` 或 `LINE_CHANNEL_ACCESS_TOKEN` / `LINE_CHANNEL_SECRET`
 - 是否已設定 `DATABASE_URL`
-- 是否已設定 `DEEPL_API_KEY`
+- 是否已設定 `AZURE_TRANSLATOR_ENDPOINT` / `AZURE_TRANSLATOR_KEY` / `AZURE_TRANSLATOR_REGION`
 - LINE Developers 的 Webhook URL 是否指向 `https://你的網域/webhook/line`
 - LINE Official Account Manager 是否已開啟 Webhook
 - 現在支援 `/選單`、`/menu`、`/主選單`、`/指令說明` 這類斜線輸入

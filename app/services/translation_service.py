@@ -14,8 +14,53 @@ DEEPL_LANGUAGE_MAP = {
     "ru": "RU",
 }  # DeepL 支援的語言映射
 
+AZURE_LANGUAGE_MAP = {
+    "zh-TW": "zh-Hant",
+    "zh-CN": "zh-Hans",
+}  # Azure 目標語言代碼映射
+
 
 google_session = requests.Session()  # Google 翻譯共用連線
+
+
+def _translate_with_azure(text: str, target_language_code: str) -> str | None:
+    endpoint = settings.azure_translator_endpoint.strip().rstrip("/")  # 讀取 Azure 端點
+    api_key = settings.azure_translator_key.strip()  # 讀取 Azure 金鑰
+    region = settings.azure_translator_region.strip()  # 讀取 Azure 區域
+    azure_target = AZURE_LANGUAGE_MAP.get(target_language_code, target_language_code)  # 轉換 Azure 語言代碼
+
+    if not endpoint or not api_key or not region:
+        return None  # 設定不足時直接回傳 None
+
+    try:
+        response = requests.post(
+            f"{endpoint}/translate",
+            params={
+                "api-version": "3.0",
+                "to": azure_target,
+            },
+            headers={
+                "Ocp-Apim-Subscription-Key": api_key,
+                "Ocp-Apim-Subscription-Region": region,
+                "Content-Type": "application/json",
+            },
+            json=[{"text": text}],
+            timeout=20,
+        )  # 呼叫 Azure Translator API
+        if response.status_code != 200:
+            return None  # Azure 失敗時交給備援
+
+        payload = response.json()  # 解析回應
+        if not payload or not isinstance(payload, list):
+            return None
+
+        translations = payload[0].get("translations", []) if isinstance(payload[0], dict) else []
+        if not translations:
+            return None
+
+        return translations[0].get("text")  # 回傳第一筆翻譯
+    except Exception:
+        return None  # Azure 例外時交給備援
 
 
 def _translate_with_deepl(text: str, target_language_code: str) -> str | None:
@@ -75,28 +120,21 @@ def translate_text(text: str, target_language_code: str) -> str:
     if _is_non_translatable(clean_text):
         return clean_text  # 數字/代碼類內容直接回傳
 
-    preferred_channel = settings.translation_channel.strip().lower() or "deepl"  # 預設通道為 DeepL
+    preferred_channel = settings.translation_channel.strip().lower() or "azure"  # 預設通道為 Azure
 
     if preferred_channel == "deepl":
+        translation_order = (_translate_with_deepl, _translate_with_azure, _translate_with_fallback)
+    elif preferred_channel == "google":
+        translation_order = (_translate_with_fallback, _translate_with_azure, _translate_with_deepl)
+    else:
+        translation_order = (_translate_with_azure, _translate_with_deepl, _translate_with_fallback)
+
+    for translator in translation_order:
         try:
-            deepl_result = _translate_with_deepl(clean_text, target_language_code)  # 預設優先使用 DeepL
-            if deepl_result:
-                return deepl_result  # DeepL 成功時直接回傳
+            result = translator(clean_text, target_language_code)
+            if result:
+                return result
         except Exception:
-            pass  # DeepL 發生任何錯誤時繼續走備援
-
-    try:
-        fallback_result = _translate_with_fallback(clean_text, target_language_code)  # 不支援語言時改用備援
-        if fallback_result:
-            return fallback_result
-    except Exception:
-        pass  # 備援失敗時最後回傳原文
-
-    try:
-        deepl_result = _translate_with_deepl(clean_text, target_language_code)  # 非 deepl 偏好時仍保留二次嘗試
-        if deepl_result:
-            return deepl_result
-    except Exception:
-        pass
+            continue
 
     return clean_text  # 若翻譯失敗則回傳原文
