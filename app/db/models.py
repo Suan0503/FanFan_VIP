@@ -74,7 +74,7 @@ class VIPSubscription(Base):
     member_code: Mapped[str] = mapped_column(String(16), nullable=False)  # 會員編號
     started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)  # 本次方案起始時間
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)  # 方案到期時間
-    current_plan: Mapped[str] = mapped_column(String(64), nullable=False, default="VIP-DEEPL-PRO-100K")  # 目前方案
+    current_plan: Mapped[str] = mapped_column(String(64), nullable=False, default="VIP-AZURE-100K")  # 目前方案
     remaining_chars: Mapped[int] = mapped_column(nullable=False, default=100000)  # 剩餘字數
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 建立時間
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 更新時間

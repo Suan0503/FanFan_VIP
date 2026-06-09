@@ -281,7 +281,7 @@ def build_main_menu_card(
     auto_detect_enabled: bool = False,
     vip_enabled: bool = False,
     vip_started_at_text: str = "-",
-    vip_plan: str = "VIP-DEEPL-PRO-100K",
+    vip_plan: str = "VIP-AZURE-100K",
     vip_remaining_chars: int = 0,
     show_vip_actions: bool = False,
 ) -> FlexMessage:
@@ -592,7 +592,7 @@ def build_tutorial_center_card(current_language_code: str = "zh-TW") -> FlexMess
                 FlexText(text=i18n["tutorial_3"], size="sm", color="#F8FAFC", wrap=True),
                 FlexText(text=i18n["tutorial_4"], size="sm", color="#F8FAFC", wrap=True),
                 FlexSeparator(margin="md"),
-                FlexText(text="補充：VIP 可使用 DeepL Pro 線路、查看群組、當日額度、群組退出控制。", size="sm", color="#D6E4F0", wrap=True),
+                FlexText(text="補充：VIP 可使用 Azure Translator 線路、查看群組、當日額度、群組退出控制。", size="sm", color="#D6E4F0", wrap=True),
             ],
         ),
         footer=FlexBox(
@@ -627,7 +627,7 @@ def build_vip_feature_menu_card(
             contents=[
                 FlexText(text="FanFan VIP", size="sm", color="#F0C24B", weight="bold"),
                 FlexText(text="VIP 功能選單", size="xxl", weight="bold", color="#FFF8E1", margin="sm"),
-                FlexText(text="DeepL Pro｜高級會員專屬", size="xs", color="#D6B46C", margin="md"),
+                FlexText(text="Azure Translator｜高級會員專屬", size="xs", color="#D6B46C", margin="md"),
             ],
         ),
         body=FlexBox(

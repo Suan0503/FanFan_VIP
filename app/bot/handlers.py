@@ -305,14 +305,14 @@ def _vip選單參數(vip_status: dict | None) -> dict:
         return {
             "vip_enabled": False,
             "vip_started_at_text": "-",
-            "vip_plan": "VIP-DEEPL-PRO-100K",
+            "vip_plan": "VIP-AZURE-100K",
             "vip_remaining_chars": 0,
         }
 
     return {
         "vip_enabled": True,
         "vip_started_at_text": _格式化時間(vip_status["started_at"]),
-        "vip_plan": str(vip_status.get("current_plan", "VIP-DEEPL-PRO-100K")),
+        "vip_plan": str(vip_status.get("current_plan", "VIP-AZURE-100K")),
         "vip_remaining_chars": int(vip_status.get("remaining_chars", 0)),
     }
 
@@ -347,9 +347,9 @@ def _建立說明文字(source_type: str, is_group_manager: bool) -> str:
         "   個人聊天可切換單一翻譯語言。",
         "4. 指令說明 / 使用說明 / 幫助",
         "   顯示這份說明。",
-        "5. 預設翻譯通道：DeepL（失敗時自動備援）。",
+        "5. 一般版翻譯通道：Google/DeepL（依設定切換，失敗時自動備援）。",
         "6. vip開通",
-        "   輸入序號啟用 VIP，預設 DeepL Pro 10萬字元。",
+        "   輸入序號啟用 VIP，預設 Azure Translator 10萬字元。",
         "7. VIP主選單",
         "   查看開通時間、當前方案、剩餘字數。",
         "8. 查看群組 / 查看當日消耗額度 / 離開群組",
@@ -607,7 +607,7 @@ def handle_text_message(event: MessageEvent) -> None:
                 "✅ 已產生 VIP 序號\n"
                 f"管理員名稱：{serial.created_by_name}\n"
                 f"序號號碼：{serial.serial_code}\n"
-                "方案：DeepL Pro 10萬字元\n"
+                "方案：Azure Translator 10萬字元\n"
                 "狀態：未使用",
             )
             return

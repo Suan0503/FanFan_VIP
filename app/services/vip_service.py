@@ -65,7 +65,7 @@ def activate_vip_by_serial(db: Session, line_user_id: str, member_code: str, ser
     if current:
         remaining_chars = max(current.remaining_chars, 0) + VIP_CHAR_BONUS_PER_ACTIVATION
 
-    plan_name = "VIP-DEEPL-PRO-100K"
+    plan_name = "VIP-AZURE-100K"
     subscription = upsert_vip_subscription(
         db=db,
         line_user_id=line_user_id,

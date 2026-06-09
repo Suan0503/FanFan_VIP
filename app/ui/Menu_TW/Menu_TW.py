@@ -25,7 +25,7 @@ MENU_ZH_TW: MenuI18n = {
     "btn_group_manage": "👥【群組翻譯】群組語言管理",
     "btn_group_intro": "👥【群組翻譯】群組功能說明",
     "btn_group_bind": "👥【群組翻譯】綁定邀請者",
-    "btn_vip": "⭐【VIP 功能】DeepL Pro｜高階翻譯能力",
+    "btn_vip": "⭐【VIP 功能】Azure Translator｜高階翻譯能力",
     "auto_detect_target_name": "中文",
     "auto_detect_status_on": "開啟中",
     "auto_detect_status_off": "關閉中",

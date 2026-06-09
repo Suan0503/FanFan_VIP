@@ -25,7 +25,7 @@ MENU_ID: MenuI18n = {
     "btn_group_manage": "👥 Pengaturan Bahasa Grup",
     "btn_group_intro": "👥 Panduan Fitur Grup",
     "btn_group_bind": "👥 Bind Pengundang Grup",
-    "btn_vip": "⭐ Fitur VIP | DeepL Pro",
+    "btn_vip": "⭐ Fitur VIP | Azure Translator",
     "auto_detect_target_name": "Bahasa Indonesia",
     "auto_detect_status_on": "Aktif",
     "auto_detect_status_off": "Nonaktif",

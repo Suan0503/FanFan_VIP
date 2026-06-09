@@ -25,7 +25,7 @@ MENU_KO: MenuI18n = {
     "btn_group_manage": "👥 그룹 언어 설정",
     "btn_group_intro": "👥 그룹 기능 안내",
     "btn_group_bind": "👥 초대자 연결",
-    "btn_vip": "⭐ VIP 기능 | DeepL Pro",
+    "btn_vip": "⭐ VIP 기능 | Azure Translator",
     "auto_detect_target_name": "한국어",
     "auto_detect_status_on": "켜짐",
     "auto_detect_status_off": "꺼짐",

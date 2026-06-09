@@ -25,7 +25,7 @@ MENU_MY: MenuI18n = {
     "btn_group_manage": "👥 Group ဘာသာစကားဆက်တင်",
     "btn_group_intro": "👥 Group လုပ်ဆောင်ချက်လမ်းညွှန်",
     "btn_group_bind": "👥 Group Inviter ချိတ်ရန်",
-    "btn_vip": "⭐ VIP လုပ်ဆောင်ချက် | DeepL Pro",
+    "btn_vip": "⭐ VIP လုပ်ဆောင်ချက် | Azure Translator",
     "auto_detect_target_name": "မြန်မာ",
     "auto_detect_status_on": "ဖွင့်ထားသည်",
     "auto_detect_status_off": "ပိတ်ထားသည်",

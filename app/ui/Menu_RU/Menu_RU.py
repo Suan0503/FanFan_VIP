@@ -25,7 +25,7 @@ MENU_RU: MenuI18n = {
     "btn_group_manage": "👥 Настройки языка группы",
     "btn_group_intro": "👥 О функциях группы",
     "btn_group_bind": "👥 Привязать пригласившего",
-    "btn_vip": "⭐ VIP Функция | DeepL Pro",
+    "btn_vip": "⭐ VIP Функция | Azure Translator",
     "auto_detect_target_name": "Русский",
     "auto_detect_status_on": "ВКЛ",
     "auto_detect_status_off": "ВЫКЛ",

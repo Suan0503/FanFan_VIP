@@ -57,8 +57,9 @@ uvicorn app.main:app --reload
 
 說明：
 
-- 翻譯預設通道為 `Azure Translator`（失敗時會自動備援）
-- 可用環境變數 `TRANSLATION_CHANNEL=azure` 明確指定通道
+- 一般用戶翻譯通道為 `Google/DeepL`（依 `TRANSLATION_CHANNEL` 決定，失敗時會自動備援）
+- VIP 用戶翻譯通道為 `Azure Translator`
+- 可用環境變數 `TRANSLATION_CHANNEL=deepl` 或 `TRANSLATION_CHANNEL=google` 指定一般版通道
 
 ## Railway 部署
 

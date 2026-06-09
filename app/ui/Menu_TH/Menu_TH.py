@@ -25,7 +25,7 @@ MENU_TH: MenuI18n = {
     "btn_group_manage": "👥 ตั้งค่าภาษากลุ่ม",
     "btn_group_intro": "👥 แนะนำฟีเจอร์กลุ่ม",
     "btn_group_bind": "👥 ผูกผู้เชิญกลุ่ม",
-    "btn_vip": "⭐ ฟีเจอร์ VIP | DeepL Pro",
+    "btn_vip": "⭐ ฟีเจอร์ VIP | Azure Translator",
     "auto_detect_target_name": "ไทย",
     "auto_detect_status_on": "เปิด",
     "auto_detect_status_off": "ปิด",

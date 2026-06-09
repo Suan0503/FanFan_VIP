@@ -25,7 +25,7 @@ MENU_EN: MenuI18n = {
     "btn_group_manage": "👥 Group Language Settings",
     "btn_group_intro": "👥 Group Feature Guide",
     "btn_group_bind": "👥 Bind Group Inviter",
-    "btn_vip": "⭐ VIP Feature | DeepL Pro",
+    "btn_vip": "⭐ VIP Feature | Azure Translator",
     "auto_detect_target_name": "English",
     "auto_detect_status_on": "ON",
     "auto_detect_status_off": "OFF",

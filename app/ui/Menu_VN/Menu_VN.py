@@ -25,7 +25,7 @@ MENU_VI: MenuI18n = {
     "btn_group_manage": "👥 Cài đặt ngôn ngữ nhóm",
     "btn_group_intro": "👥 Giới thiệu tính năng nhóm",
     "btn_group_bind": "👥 Liên kết người mời",
-    "btn_vip": "⭐ Tính năng VIP | DeepL Pro",
+    "btn_vip": "⭐ Tính năng VIP | Azure Translator",
     "auto_detect_target_name": "Tiếng Việt",
     "auto_detect_status_on": "Bật",
     "auto_detect_status_off": "Tắt",

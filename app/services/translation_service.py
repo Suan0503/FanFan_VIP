@@ -147,14 +147,14 @@ def translate_text(text: str, target_language_code: str) -> str:
     if _is_non_translatable(clean_text):
         return clean_text  # 數字/代碼類內容直接回傳
 
-    preferred_channel = settings.translation_channel.strip().lower() or "azure"  # 預設通道為 Azure
+    preferred_channel = settings.translation_channel.strip().lower() or "deepl"  # 免費版預設通道為 DeepL
 
     if preferred_channel == "deepl":
-        translation_order = (_translate_with_deepl, _translate_with_azure, _translate_with_fallback)
-    elif preferred_channel == "google":
-        translation_order = (_translate_with_fallback, _translate_with_azure, _translate_with_deepl)
+        translation_order = (_translate_with_deepl, _translate_with_fallback)
+    elif preferred_channel == "google" or preferred_channel == "gtx":
+        translation_order = (_translate_with_fallback, _translate_with_deepl)
     else:
-        translation_order = (_translate_with_azure, _translate_with_deepl, _translate_with_fallback)
+        translation_order = (_translate_with_deepl, _translate_with_fallback)
 
     for translator in translation_order:
         try:
@@ -174,7 +174,16 @@ def translate_text_vip_pro(text: str, target_language_code: str) -> str:
     if _is_non_translatable(clean_text):
         return clean_text
 
-    pro_result = _translate_with_deepl_pro(clean_text, target_language_code)  # VIP 固定走 DeepL Pro
+    vip_result = _translate_with_azure(clean_text, target_language_code)  # VIP 固定走 Azure
+    if vip_result:
+        return vip_result
+
+    pro_result = _translate_with_deepl_pro(clean_text, target_language_code)  # Azure 失敗時用 DeepL Pro 備援
     if pro_result:
         return pro_result
+
+    fallback_result = _translate_with_fallback(clean_text, target_language_code)  # 最後使用 Google 備援
+    if fallback_result:
+        return fallback_result
+
     return clean_text  # Pro 線路不可用時回原文
