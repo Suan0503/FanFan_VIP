@@ -43,6 +43,13 @@ from app.ui.welcome_i18n import get_welcome_i18n
 from app.fanfan_core.language_profile import resolve_language_code, parse_language_labels  # 匯入舊版語言解析核心
 from app.fanfan_core.group_service import ensure_group_exists, toggle_or_set_languages, reset_languages  # 匯入舊版群組設定核心
 from app.fanfan_core.formatting import detect_source_language, format_language_updated  # 匯入舊版輸出格式核心
+from app.bot.handlers_ai import (
+    handle_ai_menu_command,
+    handle_ai_start_command,
+    handle_ai_chat,
+    handle_ai_history_command,
+    handle_ai_stats_command,
+)  # 匯入 AI 指令處理
 
 
 configuration = Configuration(access_token=settings.line_channel_access_token)  # 建立 LINE API 設定
@@ -107,10 +114,19 @@ VIP查看群組指令 = {"查看群組"}
 VIP查看當日消耗指令 = {"查看當日消耗額度"}
 VIP離開群組指令 = {"離開群組"}
 
+# AI 對話指令
+AI菜單指令 = {"ai", "ai菜單", "/ai", "ai助手", "🤖"}
+AI開始對話指令 = {"ai開始", "/ai開始", "ai start", "/ai start"}
+AI歷史指令 = {"ai歷史", "/ai歷史", "ai history", "/ai history"}
+AI統計指令 = {"ai統計", "/ai統計", "ai stats", "/ai stats"}
+AI繼續對話指令 = {"ai繼續", "ai繼續對話", "ai continue"}
+AI返回翻譯指令 = {"/返回", "/回到翻譯", "返回翻譯", "/back", "/return to translation", "返回"}
+
 待輸入VIP序號使用者: set[str] = set()  # 等待輸入序號狀態
 待離開群組選擇: dict[str, list[str]] = {}  # 使用者待選擇離開群組列表
 超管群組在場狀態: dict[str, bool] = {}  # 記錄超級管理員是否在群組內
 超管翻譯鎖定狀態: dict[str, bool] = {}  # 記錄群組是否啟用超管翻譯鎖定（預設啟用）
+AI對話上下文: dict[str, str] = {}  # 記錄用戶當前的 conversation_id
 
 
 def _狀態鍵(source_type: str, user_id: str | None, group_id: str | None) -> str:
@@ -873,6 +889,44 @@ def handle_text_message(event: MessageEvent) -> None:
             )  # 顯示主選單小卡
             return
 
+        # AI 對話指令處理
+        if text_for_command in AI菜單指令:
+            current_language_code = _current_language_code(source_type, user, group_id, db)
+            handle_ai_menu_command(reply_token, current_language_code)
+            return
+
+        if text_for_command in AI開始對話指令:
+            current_language_code = _current_language_code(source_type, user, group_id, db)
+            handle_ai_start_command(reply_token, user_id, current_language_code)
+            return
+
+        if text_for_command in AI歷史指令:
+            current_language_code = _current_language_code(source_type, user, group_id, db)
+            handle_ai_history_command(reply_token, user_id, current_language_code)
+            return
+
+        if text_for_command in AI統計指令:
+            current_language_code = _current_language_code(source_type, user, group_id, db)
+            handle_ai_stats_command(reply_token, user_id, current_language_code)
+            return
+
+        if text_for_command in AI返回翻譯指令:
+            user_state_key = f"ai:{user_id}" if user_id else None
+            if user_state_key and user_state_key in AI對話上下文:
+                AI對話上下文.pop(user_state_key, None)
+                current_lang = _current_language_code(source_type, user, group_id, db)
+                if current_lang == "zh-TW":
+                    _reply_text(reply_token, "✅ 已返回翻譯模式\n\n現在輸入文字會直接進行翻譯。")
+                else:
+                    _reply_text(reply_token, "✅ Returned to translation mode\n\nText input will be translated directly.")
+            else:
+                current_lang = _current_language_code(source_type, user, group_id, db)
+                if current_lang == "zh-TW":
+                    _reply_text(reply_token, "⚠️ 你目前不在 AI 對話模式")
+                else:
+                    _reply_text(reply_token, "⚠️ You are not in AI chat mode")
+            return
+
         if text_for_command in 旅遊模式指令:
             current_language_code = _current_language_code(source_type, user, group_id, db)
             _reply_messages(
@@ -1112,6 +1166,15 @@ def handle_text_message(event: MessageEvent) -> None:
                 return
             bind_group_inviter(db, group, user_id)  # 綁定邀請者代表
             _reply_text(reply_token, "邀請者代表綁定完成，現在你可管理本群翻譯語言。")  # 回覆成功
+            return
+
+        # AI 對話邏輯：檢查用戶是否在進行 AI 對話
+        user_state_key = f"ai:{user_id}" if user_id else None
+        if user_state_key and user_state_key in AI對話上下文:
+            # 用戶在進行AI對話，直接進行對話而不是翻譯
+            conversation_id = AI對話上下文.get(user_state_key)
+            current_language_code = _current_language_code(source_type, user, group_id, db)
+            handle_ai_chat(reply_token, user_id, text, conversation_id, current_language_code)
             return
 
         translation_enabled, auto_detect_enabled = _目前開關狀態(

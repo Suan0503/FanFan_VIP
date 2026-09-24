@@ -1,6 +1,6 @@
 from datetime import datetime  # 匯入時間型別
 
-from sqlalchemy import String, DateTime, Boolean, UniqueConstraint, ForeignKey  # 匯入欄位型別
+from sqlalchemy import String, DateTime, Boolean, UniqueConstraint, ForeignKey, Integer, Text, JSON  # 匯入欄位型別
 from sqlalchemy.orm import Mapped, mapped_column  # 匯入欄位映射
 
 from app.db.base import Base  # 匯入 Base
@@ -88,4 +88,44 @@ class VIPUsageLog(Base):
     source_type: Mapped[str] = mapped_column(String(16), nullable=False)  # 來源類型 user/group
     source_id: Mapped[str] = mapped_column(String(64), nullable=False)  # 來源 ID
     consumed_chars: Mapped[int] = mapped_column(nullable=False, default=0)  # 消耗字數
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 建立時間
+
+
+class AIConversation(Base):
+    __tablename__ = "ai_conversations"  # AI 對話紀錄表
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)  # 主鍵
+    line_user_id: Mapped[str] = mapped_column(String(64), nullable=False)  # 對話者 LINE ID
+    conversation_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)  # 對話ID（用於上下文）
+    title: Mapped[str] = mapped_column(String(255), nullable=True)  # 對話標題
+    is_group: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # 是否群組對話
+    group_id: Mapped[str | None] = mapped_column(String(64), nullable=True)  # 群組ID（如果是群組）
+    message_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 消息計數
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 建立時間
+    last_message_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 最後消息時間
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # 對話過期時間（7天自動清理）
+
+
+class AIMessage(Base):
+    __tablename__ = "ai_messages"  # AI 消息紀錄表
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)  # 主鍵
+    conversation_id: Mapped[str] = mapped_column(String(64), ForeignKey("ai_conversations.conversation_id"), nullable=False)  # 對話ID
+    role: Mapped[str] = mapped_column(String(16), nullable=False)  # 角色：user/assistant
+    content: Mapped[str] = mapped_column(Text, nullable=False)  # 消息內容
+    tokens_used: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 使用的 token 數
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 建立時間
+
+
+class AIUsageLog(Base):
+    __tablename__ = "ai_usage_logs"  # AI 使用量紀錄表
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)  # 主鍵
+    line_user_id: Mapped[str] = mapped_column(String(64), nullable=False)  # 使用者 LINE ID
+    conversation_id: Mapped[str] = mapped_column(String(64), nullable=False)  # 對話ID
+    query: Mapped[str] = mapped_column(Text, nullable=False)  # 查詢內容
+    response: Mapped[str] = mapped_column(Text, nullable=False)  # 回應內容
+    tokens_input: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 輸入 token
+    tokens_output: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 輸出 token
+    is_vip: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # 是否 VIP 用戶
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)  # 建立時間

@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     app_owner_user_ids: str = Field(default="", validation_alias=AliasChoices("APP_OWNER_USER_IDS"))  # 所有者 ID 字串
     database_url: str = Field(default="sqlite:///./translator.db", validation_alias=AliasChoices("DATABASE_URL"))  # 資料庫連線
 
+    # AI 對話配置
+    gemini_api_key: str = Field(default="", validation_alias=AliasChoices("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"))  # Google Gemini API Key
+    gemini_model: str = Field(default="gemini-2.0-flash", validation_alias=AliasChoices("GEMINI_MODEL"))  # Gemini 模型
+    ai_free_daily_limit: int = Field(default=10, validation_alias=AliasChoices("AI_FREE_DAILY_LIMIT"))  # 一般用戶每日免費對話次數
+    ai_vip_daily_limit: int = Field(default=100, validation_alias=AliasChoices("AI_VIP_DAILY_LIMIT"))  # VIP 用戶每日對話次數
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")  # 指定 .env
 
     @property
