@@ -22,7 +22,7 @@ def handle_ai_start_command(reply_token: str, user_id: str, user_locale: str = "
         from app.core.config import settings
         config = Configuration(access_token=settings.line_channel_access_token)
         api = MessagingApi(config)
-        api.reply_message(reply_token, TextMessage(text="❌ AI 服務暫時不可用"))
+        api.reply_message(reply_token, [TextMessage(text="❌ AI 服務暫時不可用")])
         return
 
     db = SessionLocal()
@@ -52,7 +52,7 @@ def handle_ai_start_command(reply_token: str, user_id: str, user_locale: str = "
 
         api.reply_message(
             reply_token,
-            TextMessage(text=reply_text)
+            [TextMessage(text=reply_text)]
         )
     finally:
         db.close()
@@ -73,7 +73,7 @@ def handle_ai_chat(
         from app.core.config import settings
         config = Configuration(access_token=settings.line_channel_access_token)
         api = MessagingApi(config)
-        api.reply_message(reply_token, TextMessage(text="❌ AI 服務暫時不可用"))
+        api.reply_message(reply_token, [TextMessage(text="❌ AI 服務暫時不可用")])
         return
 
     db = SessionLocal()
@@ -98,10 +98,13 @@ def handle_ai_chat(
             from app.core.config import settings
             config = Configuration(access_token=settings.line_channel_access_token)
             api = MessagingApi(config)
-            api.reply_message(reply_token, TextMessage(text=response))
+            api.reply_message(reply_token, [TextMessage(text=response)])
             return
 
         # 構建回應卡片
+        from linebot.v3.messaging import MessagingApi, Configuration, FlexMessage
+        from app.core.config import settings
+
         card = build_ai_conversation_card(
             conversation_id=conv_id,
             query=message,
@@ -111,22 +114,22 @@ def handle_ai_chat(
             user_locale=user_locale,
         )
 
-        from linebot.v3.messaging import MessagingApi, Configuration
-        from app.core.config import settings
         config = Configuration(access_token=settings.line_channel_access_token)
         api = MessagingApi(config)
 
-        api.reply_message(
-            reply_token,
-            FlexMessage(altText=user_locale == "zh-TW" and "💬 AI 回應" or "💬 AI Response", contents=card["contents"])
+        message_obj = FlexMessage(
+            altText=user_locale == "zh-TW" and "💬 AI 回應" or "💬 AI Response",
+            contents=card["contents"]
         )
+
+        api.reply_message(reply_token, [message_obj])
     except Exception as e:
         print(f"AI Chat Error: {str(e)}")
         from linebot.v3.messaging import MessagingApi, Configuration
         from app.core.config import settings
         config = Configuration(access_token=settings.line_channel_access_token)
         api = MessagingApi(config)
-        api.reply_message(reply_token, TextMessage(text=f"❌ 發生錯誤：{str(e)[:50]}"))
+        api.reply_message(reply_token, [TextMessage(text=f"❌ 發生錯誤：{str(e)[:50]}")])
     finally:
         db.close()
 
@@ -136,20 +139,20 @@ def handle_ai_menu_command(reply_token: str, user_locale: str = "zh-TW") -> None
     處理 /ai 或 /ai菜單 指令
     顯示 AI 助手菜單
     """
+    from linebot.v3.messaging import MessagingApi, Configuration, FlexMessage, ReplyMessageRequest
+    from app.core.config import settings
+
     card = build_ai_menu_card(user_locale)
 
-    from linebot.v3.messaging import MessagingApi, Configuration, FlexMessage
-    from app.core.config import settings
     config = Configuration(access_token=settings.line_channel_access_token)
     api = MessagingApi(config)
 
-    api.reply_message(
-        reply_token,
-        FlexMessage(
-            altText=user_locale == "zh-TW" and "🤖 AI 助手" or "🤖 AI Assistant",
-            contents=card["contents"]
-        )
+    message = FlexMessage(
+        altText=user_locale == "zh-TW" and "🤖 AI 助手" or "🤖 AI Assistant",
+        contents=card["contents"]
     )
+
+    api.reply_message(reply_token, [message])
 
 
 def handle_ai_history_command(reply_token: str, user_id: str, user_locale: str = "zh-TW") -> None:
@@ -162,7 +165,7 @@ def handle_ai_history_command(reply_token: str, user_id: str, user_locale: str =
         from app.core.config import settings
         config = Configuration(access_token=settings.line_channel_access_token)
         api = MessagingApi(config)
-        api.reply_message(reply_token, TextMessage(text="❌ AI 服務暫時不可用"))
+        api.reply_message(reply_token, [TextMessage(text="❌ AI 服務暫時不可用")])
         return
 
     try:
@@ -188,13 +191,13 @@ def handle_ai_history_command(reply_token: str, user_id: str, user_locale: str =
         config = Configuration(access_token=settings.line_channel_access_token)
         api = MessagingApi(config)
 
-        api.reply_message(reply_token, TextMessage(text=text))
+        api.reply_message(reply_token, [TextMessage(text=text)])
     except Exception as e:
         from linebot.v3.messaging import MessagingApi, Configuration
         from app.core.config import settings
         config = Configuration(access_token=settings.line_channel_access_token)
         api = MessagingApi(config)
-        api.reply_message(reply_token, TextMessage(text=f"❌ 錯誤：{str(e)[:50]}"))
+        api.reply_message(reply_token, [TextMessage(text=f"❌ 錯誤：{str(e)[:50]}")])
 
 
 def handle_ai_stats_command(reply_token: str, user_id: str, user_locale: str = "zh-TW") -> None:
@@ -231,12 +234,12 @@ def handle_ai_stats_command(reply_token: str, user_id: str, user_locale: str = "
         config = Configuration(access_token=settings.line_channel_access_token)
         api = MessagingApi(config)
 
-        api.reply_message(reply_token, TextMessage(text=text))
+        api.reply_message(reply_token, [TextMessage(text=text)])
     except Exception as e:
         from linebot.v3.messaging import MessagingApi, Configuration
         from app.core.config import settings
         config = Configuration(access_token=settings.line_channel_access_token)
         api = MessagingApi(config)
-        api.reply_message(reply_token, TextMessage(text=f"❌ 錯誤：{str(e)[:50]}"))
+        api.reply_message(reply_token, [TextMessage(text=f"❌ 錯誤：{str(e)[:50]}")])
     finally:
         db.close()
